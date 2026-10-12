@@ -1488,7 +1488,7 @@
                 </div>
                 <h4 class="text-sm font-bold text-slate-900">Kredensial Terenkripsi</h4>
                 <p class="text-xs text-slate-600 leading-relaxed">
-                    Dashboard dan webhook diakses lewat HTTPS dengan HSTS, dan password root disimpan terenkripsi AES-256 serta hanya bisa dibuka setelah verifikasi password akun.
+                    Dashboard dan webhook diakses lewat HTTPS dengan HSTS, dan password server disimpan terenkripsi AES-256 dan hanya bisa dibuka oleh pemilik akun dari dashboard.
                 </p>
             </div>
 

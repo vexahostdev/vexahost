@@ -361,7 +361,7 @@
                                 <tbody class="divide-y divide-slate-200">
                                     <tr>
                                         <td class="p-3 border border-slate-200">Data Virtual Disk VPS (Node)</td>
-                                        <td class="p-3 border border-slate-200 font-mono-code text-slate-800">3 hari setelah jatuh tempo</td>
+                                        <td class="p-3 border border-slate-200 font-mono-code text-slate-800">{{ app(\App\Services\SettingsService::class)->int('renewal_grace_days_vps', 5) }} hari setelah jatuh tempo</td>
                                         <td class="p-3 border border-slate-200">Zero-fill override &amp; penghapusan partisi virtual.</td>
                                     </tr>
                                     <tr>

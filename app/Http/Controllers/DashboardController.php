@@ -416,7 +416,7 @@ class DashboardController extends Controller
     {
         try {
             $ticket->loadMissing('customer');
-            $adminEmail = config('vexahost.admin_email', config('mail.from.address'));
+            $adminEmail = app(\App\Services\AdminAlertService::class)->adminEmail();
             if ($adminEmail) {
                 \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                     ->notify(new \App\Notifications\AdminTicketNotification($ticket, $message, $eventType));
@@ -425,35 +425,39 @@ class DashboardController extends Controller
             $logKey = $eventType === 'created' ? 'support.ticket_create.notify_failed' : 'support.ticket_reply.notify_failed';
             \Illuminate\Support\Facades\Log::error($logKey, ['ticket_id' => $ticket->id, 'error' => $e->getMessage()]);
         }
+
+        // WA admin: tiket & permintaan layanan (reinstall, server tak bisa diakses) tidak
+        // boleh hanya mengandalkan surel. Tidak pernah melempar exception.
+        app(\App\Services\AdminAlertService::class)->ticket($ticket, $message, $eventType);
     }
 
+    /**
+     * Ikon mata di tab Akses: kembalikan password SSH awal (didekripsi dari kolom
+     * terenkripsi) tanpa meminta password akun. Pengaman yang tetap berlaku:
+     * login + organisasi pemilik + izin vps.credentials, batas laju, dan log aktivitas.
+     */
     public function revealPassword(Request $request, $id)
     {
         $throttleKey = 'reveal_password|' . Auth::id() . '|' . $request->ip();
 
-        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+        if (RateLimiter::tooManyAttempts($throttleKey, 30)) {
             $seconds = RateLimiter::availableIn($throttleKey);
             return response()->json([
                 'success' => false,
-                'message' => "Terlalu banyak percobaan verifikasi. Silakan coba lagi dalam {$seconds} detik.",
+                'message' => "Terlalu sering membuka password. Silakan coba lagi dalam {$seconds} detik.",
             ], 429);
         }
 
+        RateLimiter::hit($throttleKey, 300);
+
         $vps = VpsInstance::where('organization_id', $this->organizationId())->findOrFail($id);
 
-        $request->validate([
-            'password' => 'required|string',
-        ]);
-
-        if (!Hash::check($request->password, Auth::user()->password)) {
-            RateLimiter::hit($throttleKey, 300); // 5 minutes decay
+        if (empty($vps->initial_root_password)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Password akun yang Anda masukkan salah. Verifikasi keamanan gagal.',
-            ], 403);
+                'message' => 'Password belum tersedia untuk server ini. Silakan hubungi support.',
+            ], 404);
         }
-
-        RateLimiter::clear($throttleKey);
 
         $vps->update([
             'root_password_revealed_at' => now(),
@@ -461,19 +465,14 @@ class DashboardController extends Controller
 
         $vps->logActivity(
             action: 'password_reveal',
-            description: 'Kredensial root password diakses melalui verifikasi password akun pengguna',
+            description: 'Password SSH dibuka melalui ikon mata di tab Akses',
             status: 'completed'
         );
-
-        // Password visible untuk 60 detik saja. FE wajib menyembunyikan setelah expires_at.
-        $expiresAt = now()->addSeconds(60);
 
         return response()->json([
             'success' => true,
             'password' => $vps->initial_root_password,
             'revealed_at' => $vps->root_password_revealed_at->timezone('Asia/Jakarta')->format('d M Y H:i:s'),
-            'expires_at' => $expiresAt->toIso8601String(),
-            'visible_seconds' => 60,
         ]);
     }
 
@@ -574,6 +573,10 @@ class DashboardController extends Controller
 
                 return $order;
             });
+
+            // Order ini dibuat langsung berstatus 'paid' (tanpa state machine), jadi titik
+            // "setelah lunas" dipanggil manual: email pelanggan + info admin (idempoten).
+            app(\App\Services\PaymentCompletionService::class)->handle($order->id);
 
             return redirect()->route('dashboard.vps.show', $instance->id)
                 ->with('success', 'Perpanjangan layanan berhasil menggunakan Saldo Akun! Masa aktif server telah diperpanjang.');

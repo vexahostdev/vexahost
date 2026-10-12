@@ -166,6 +166,13 @@ class OrderStateMachine
                 'reason' => $reason,
             ]);
 
+            // Titik tunggal "setelah lunas": perpanjangan + notifikasi pelanggan & admin.
+            // Dijalankan setelah transaksi terluar commit agar data (invoice, dll) sudah final.
+            if ($to === 'paid') {
+                $orderId = $locked->id;
+                DB::afterCommit(fn () => app(PaymentCompletionService::class)->handle($orderId));
+            }
+
             return $locked;
         });
     }

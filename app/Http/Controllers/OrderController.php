@@ -721,20 +721,8 @@ class OrderController extends Controller
                 'ip' => $request->ip(),
             ]);
 
-            // Kirim notifikasi email ke pelanggan & admin
-            try {
-                $order->loadMissing(['customer', 'vpsSpec', 'invoice']);
-                if ($order->customer) {
-                    $order->customer->notify(new \App\Notifications\PaymentReceivedNotification($order, $order->invoice));
-                }
-                $adminEmail = config('vexahost.admin_email', config('mail.from.address'));
-                if ($adminEmail) {
-                    \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
-                        ->notify(new \App\Notifications\AdminNewPaidOrderNotification($order));
-                }
-            } catch (\Throwable $e) {
-                Log::error('order.payment.dev_simulated_notify_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-            }
+            // Notifikasi pelanggan & admin dikirim otomatis oleh PaymentCompletionService
+            // (dipicu OrderStateMachine saat transisi ke 'paid').
         } catch (\Throwable $e) {
             Log::error('order.payment.dev_simulate_failed', [
                 'order_id' => $order->id,

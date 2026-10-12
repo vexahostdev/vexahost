@@ -58,12 +58,21 @@ class Order extends Model
         'fulfillment_stage',
         'delivered_at',
         'sla_alerted_at',
+        // Penjaga "setelah lunas" (PaymentCompletionService).
+        'paid_notified_at',
+        'renewal_applied_at',
+        'admin_reminder_count',
+        'admin_reminded_at',
     ];
 
     protected $casts = [
         'paid_at' => 'datetime',
         'delivered_at' => 'datetime',
         'sla_alerted_at' => 'datetime',
+        'paid_notified_at' => 'datetime',
+        'renewal_applied_at' => 'datetime',
+        'admin_reminded_at' => 'datetime',
+        'admin_reminder_count' => 'integer',
         'starts_at' => 'datetime',
         'expires_at' => 'datetime',
         'grace_period_ends_at' => 'datetime',
@@ -234,6 +243,41 @@ class Order extends Model
     public function getResolvedInstanceAttribute(): ?VpsInstance
     {
         return $this->vps_instance_id ? $this->renewalVpsInstance : $this->vpsInstance;
+    }
+
+    /**
+     * Awal masa aktif layanan = waktu pelunasan, BUKAN waktu admin selesai setup.
+     * Keterlambatan setup tidak boleh menggeser tanggal jatuh tempo pelanggan.
+     * Cadangan now() hanya untuk order lama tanpa paid_at.
+     */
+    public function activationStartsAt(): \Illuminate\Support\Carbon
+    {
+        $paidAt = $this->paid_at ? \Illuminate\Support\Carbon::parse($this->paid_at) : null;
+
+        return ($paidAt && $paidAt->lessThanOrEqualTo(now())) ? $paidAt->copy() : now();
+    }
+
+    /** Janji waktu setup ke pelanggan (Ketentuan Layanan pasal 5.5). */
+    public const SETUP_SLA_HOURS = 24;
+
+    /**
+     * Awal masa aktif saat admin menyerahkan server (order baru).
+     * - Diserahkan ≤ 24 jam sejak lunas → dihitung sejak lunas.
+     * - Lewat 24 jam (SLA dilanggar) → dihitung sejak diserahkan, sebagai kompensasi
+     *   otomatis sehingga pelanggan tidak kehilangan masa aktif karena keterlambatan kita.
+     */
+    public function provisioningStartsAt(): \Illuminate\Support\Carbon
+    {
+        $paidAt = $this->activationStartsAt();
+
+        return $this->setupSlaBreached($paidAt) ? now() : $paidAt;
+    }
+
+    public function setupSlaBreached(?\Illuminate\Support\Carbon $paidAt = null): bool
+    {
+        $paidAt ??= $this->activationStartsAt();
+
+        return $paidAt->copy()->addHours(self::SETUP_SLA_HOURS)->lessThan(now());
     }
 
     public function isRenewal(): bool

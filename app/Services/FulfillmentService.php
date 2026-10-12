@@ -189,6 +189,7 @@ class FulfillmentService
             'layanan' => $instance->hostname ?: ('Order #' . $order->id),
             'ip' => $instance->public_ip ?: '-',
             'port_ssh' => (string) ($instance->ssh_port ?: 22),
+            'pengguna' => $instance->ssh_user,
             'os' => $order->os_label ?: ($instance->os ?: '-'),
             'url_aplikasi' => $instance->app_url ? 'URL aplikasi: ' . $instance->app_url : '',
             'dasbor' => rtrim((string) config('app.url'), '/') . '/dashboard',

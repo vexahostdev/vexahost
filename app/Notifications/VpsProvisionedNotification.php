@@ -59,6 +59,7 @@ class VpsProvisionedNotification extends Notification
         $paket = $this->instance->order?->vpsSpec?->name ?? 'VPS Instance';
         $ip = $this->instance->public_ip ?? 'Pending';
         $port = $this->instance->ssh_port ?? 22;
+        $sshUser = $this->instance->ssh_user;
         $os = strtoupper($this->instance->os ?? 'Ubuntu');
         $password = $this->instance->initial_root_password ? "`{$this->instance->initial_root_password}`" : '(Tersimpan di dashboard)';
         $dashboardUrl = "{$appUrl}/dashboard/vps/{$this->instance->id}";
@@ -74,14 +75,14 @@ class VpsProvisionedNotification extends Notification
             "• *Hostname:* `{$this->instance->hostname}`",
             "• *IP Public:* `{$ip}`",
             "• *Port SSH:* `{$port}`",
-            "• *Username:* `root`",
-            "• *Password Root:* {$password}",
+            "• *Username:* `{$sshUser}`",
+            "• *Password:* {$password}",
             "• *Sistem Operasi:* {$os}",
             '',
             '💻 *Akses Cepat Terminal (SSH):*',
-            "`ssh root@{$ip} -p {$port}`",
+            "`ssh {$sshUser}@{$ip} -p {$port}`",
             '',
-            '⚠️ _Demi keamanan, segera ganti password root default Anda setelah berhasil login pertama kali._',
+            '⚠️ _Demi keamanan, segera ganti password default Anda setelah berhasil login pertama kali._',
             '',
             'Buka Dashboard Server:',
             $dashboardUrl,

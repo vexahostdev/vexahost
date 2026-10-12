@@ -24,12 +24,14 @@ class RenewalReminder extends Model
         'sent_at' => 'datetime',
     ];
 
+    public const STAGE_H7 = 'h_minus_7';
     public const STAGE_H3 = 'h_minus_3';
     public const STAGE_H1 = 'h_minus_1';
     public const STAGE_H0 = 'h_zero';
     public const STAGE_GRACE_ENDED = 'grace_ended';
 
     public const STAGES = [
+        self::STAGE_H7,
         self::STAGE_H3,
         self::STAGE_H1,
         self::STAGE_H0,

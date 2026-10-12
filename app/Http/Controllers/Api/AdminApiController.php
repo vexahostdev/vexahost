@@ -44,7 +44,8 @@ class AdminApiController extends Controller
             'control_panel' => 'required|string',
             'hostname' => 'required|string',
             'ssh_port' => 'nullable|integer|min:1|max:65535',
-        ]);
+            'ssh_username' => VpsInstance::SSH_USERNAME_RULE,
+        ], VpsInstance::SSH_USERNAME_MESSAGES);
 
         $order = Order::with('vpsSpec')->findOrFail($validated['order_id']);
 
@@ -77,7 +78,8 @@ class AdminApiController extends Controller
                 $order->refresh();
 
                 $spec = $order->vpsSpec;
-                $startsAt = now();
+                // Masa aktif dihitung sejak lunas; lewat SLA 24 jam → sejak diserahkan (kompensasi).
+                $startsAt = $order->provisioningStartsAt();
                 $months = match ($order->billing_cycle ?? 'monthly') {
                     'quarterly' => 3,
                     'semi_annual' => 6,
@@ -110,6 +112,7 @@ class AdminApiController extends Controller
                     'public_ip' => $validated['server_ip'],
                     'private_ip' => $validated['private_ip'] ?? null,
                     'ssh_port' => $validated['ssh_port'] ?? 22,
+                    'ssh_username' => VpsInstance::normalizeSshUsername($validated['ssh_username'] ?? null),
                     'initial_root_password' => $validated['server_root_password'] ?? null,
                     'os' => $validated['os'],
                     'datacenter_location' => $validated['datacenter_location'],

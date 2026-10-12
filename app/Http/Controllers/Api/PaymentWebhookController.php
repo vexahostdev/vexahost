@@ -392,27 +392,10 @@ class PaymentWebhookController extends Controller
      */
     protected function dispatchPostPaymentNotifications(Order $order): void
     {
-        // Kirim email pembayaran diterima ke customer
-        try {
-            $order->loadMissing(['customer', 'vpsSpec', 'invoice']);
-            $customer = $order->customer;
-            if ($customer) {
-                $customer->notify(new \App\Notifications\PaymentReceivedNotification($order, $order->invoice));
-            }
-        } catch (\Throwable $e) {
-            Log::error('payment.notify_customer_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-        }
-
-        // Kirim notifikasi pesanan baru lunas ke admin
-        try {
-            $adminEmail = env('VEXAHOST_ADMIN_EMAIL', config('mail.from.address'));
-            if ($adminEmail) {
-                \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
-                    ->notify(new \App\Notifications\AdminNewPaidOrderNotification($order));
-            }
-        } catch (\Throwable $e) {
-            Log::error('payment.notify_admin_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-        }
+        // Notifikasi pelanggan & admin dikirim dari titik pusat. Sudah dipicu otomatis
+        // oleh OrderStateMachine saat transisi ke 'paid'; panggilan ini hanya pengaman
+        // dan idempoten (orders.paid_notified_at) sehingga tidak pernah terkirim dobel.
+        app(\App\Services\PaymentCompletionService::class)->handle($order->id);
     }
 
     /**

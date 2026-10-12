@@ -320,6 +320,7 @@ Route::middleware(['auth', '2fa', 'org.context'])->group(function () {
         Route::get('/reports/export', [AdminController::class, 'exportReport'])->name('reports.export');
         Route::post('/instances/{id}/status', [AdminController::class, 'updateInstanceStatus'])->name('instances.status');
         Route::post('/instances/{id}/panel-url', [AdminController::class, 'updateInstancePanelUrl'])->name('instances.panel-url');
+        Route::post('/instances/{id}/ssh-username', [AdminController::class, 'updateInstanceSshUsername'])->name('instances.ssh-username');
         Route::post('/instances/{id}/renewal-price', [AdminController::class, 'updateInstanceRenewalPrice'])->name('instances.renewal-price');
         Route::post('/instances/{id}/suspend', [AdminController::class, 'suspendInstance'])->name('instances.suspend');
         Route::post('/instances/{id}/unsuspend', [AdminController::class, 'unsuspendInstance'])->name('instances.unsuspend');
@@ -343,6 +344,7 @@ Route::middleware(['auth', '2fa', 'org.context'])->group(function () {
         Route::post('/settings/company', [AdminSettingsController::class, 'updateCompany'])->name('settings.company');
         Route::post('/settings/support', [AdminSettingsController::class, 'updateSupport'])->name('settings.support');
         Route::post('/settings/notification', [AdminSettingsController::class, 'updateNotification'])->name('settings.notification');
+        Route::post('/settings/notification/test', [AdminSettingsController::class, 'testNotification'])->middleware('throttle:5,1')->name('settings.notification.test');
         Route::post('/settings/maintenance', [AdminSettingsController::class, 'updateMaintenance'])->name('settings.maintenance');
         Route::post('/settings/bypass-token', [AdminSettingsController::class, 'regenerateBypassToken'])->name('settings.bypass-token');
         Route::post('/settings/components/{id}', [AdminSettingsController::class, 'updateComponent'])->name('settings.components.update');

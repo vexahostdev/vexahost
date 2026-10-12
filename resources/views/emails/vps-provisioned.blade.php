@@ -43,11 +43,11 @@
                 </tr>
                 <tr>
                     <td style="padding: 6px 0; color: #71717a;">Username:</td>
-                    <td style="padding: 6px 0; color: #000000; font-family: Consolas, Monaco, monospace; font-weight: 600;">root</td>
+                    <td style="padding: 6px 0; color: #000000; font-family: Consolas, Monaco, monospace; font-weight: 600;">{{ $instance->ssh_user }}</td>
                 </tr>
                 @if($instance->initial_root_password)
                 <tr>
-                    <td style="padding: 6px 0; color: #71717a;">Password Root:</td>
+                    <td style="padding: 6px 0; color: #71717a;">Password:</td>
                     <td style="padding: 6px 0;">
                         <span style="display: inline-block; background-color: #f4f4f5; color: #000000; border: 1px solid #d4d4d8; padding: 2px 8px; border-radius: 4px; font-family: Consolas, Monaco, monospace; font-weight: 700; font-size: 13px;">
                             {{ $instance->initial_root_password }}
@@ -74,12 +74,12 @@
 <div style="background-color: #f4f4f5; border: 1px solid #e4e4e7; border-radius: 6px; padding: 12px 16px; margin-bottom: 24px;">
     <span style="color: #71717a; font-size: 12px; display: block; margin-bottom: 4px;">Akses cepat terminal (SSH):</span>
     <code style="color: #000000; font-family: Consolas, Monaco, monospace; font-size: 13px; font-weight: 600;">
-        ssh root{{ '@' }}{{ $instance->public_ip ?? 'IP_SERVER' }} -p {{ $instance->ssh_port ?? 22 }}
+        ssh {{ $instance->ssh_user }}{{ '@' }}{{ $instance->public_ip ?? 'IP_SERVER' }} -p {{ $instance->ssh_port ?? 22 }}
     </code>
 </div>
 
 <p style="margin: 0 0 8px 0; font-size: 13px; line-height: 1.5; color: #71717a;">
-    Demi keamanan, silakan segera ubah password root awal Anda setelah berhasil login pertama kali.
+    Demi keamanan, silakan segera ubah password awal Anda setelah berhasil login pertama kali.
 </p>
 
 <!-- Solid Black Action Button -->

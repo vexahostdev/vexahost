@@ -312,9 +312,14 @@
                     <input type="text" name="public_ip" required placeholder="103.150.xxx.xxx" class="{{ $inputClass }} font-mono-code">
                 </div>
                 <div>
-                    <label class="{{ $labelClass }}">Root Password Server <span class="text-rose-600">*</span></label>
-                    <input type="text" name="root_password" required minlength="8" placeholder="Password root dari retail (min 8 karakter)" class="{{ $inputClass }} font-mono-code">
-                    <p class="text-[10px] text-slate-400 mt-1">Kredensial root yang diterbitkan oleh provider retail.</p>
+                    <label class="{{ $labelClass }}">Username SSH</label>
+                    <input type="text" name="ssh_username" value="root" maxlength="32" pattern="[A-Za-z_][A-Za-z0-9._\-]{0,31}" autocomplete="off" spellcheck="false" class="{{ $inputClass }} font-mono-code">
+                    <p class="text-[10px] text-slate-400 mt-1">Default <code>root</code>. Ganti bila supplier memberi user lain (mis. <code>ubuntu</code>).</p>
+                </div>
+                <div>
+                    <label class="{{ $labelClass }}">Password SSH Server <span class="text-rose-600">*</span></label>
+                    <input type="text" name="root_password" required minlength="8" placeholder="Password dari retail (min 8 karakter)" class="{{ $inputClass }} font-mono-code">
+                    <p class="text-[10px] text-slate-400 mt-1">Kredensial login yang diterbitkan oleh provider retail.</p>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>

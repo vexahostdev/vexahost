@@ -79,14 +79,32 @@ Schedule::command('renewal:remind')
 // ============================================================
 // PHASE 5 - Peringatan waktu tanggap fulfillment
 // ============================================================
-// Tiap jam agar keterlambatan cepat diketahui. Tiap order hanya
-// diperingatkan sekali (orders.sla_alerted_at).
-Schedule::command('fulfillment:check-sla')
-    ->hourly()
+// Diganti pengingat bertahap (WA + email): 30 menit → 1 jam → tiap 2 jam
+// sampai order diserahkan. fulfillment:check-sla (sekali, email saja) tidak
+// dijadwalkan lagi agar admin tidak menerima surel ganda; command-nya tetap
+// ada untuk dijalankan manual.
+// Auto-renew di Supplier dimatikan: admin memperpanjang manual setelah pelanggan bayar.
+// Pagi: ringkasan lengkap. Siang/sore/malam: hanya yang mendesak (≤ 3 hari).
+Schedule::command('supplier:remind-admin --daily')
+    ->dailyAt('08:00')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping()
     ->onOneServer()
-    ->description('Peringatkan admin tentang order dibayar yang belum diserahkan melewati ambang.');
+    ->description('Ringkasan pagi tugas perpanjangan di Supplier (WA + email).');
+
+Schedule::command('supplier:remind-admin')
+    ->cron('0 12,16,20 * * *')
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->description('Pengingat VPS yang harus segera diperpanjang di Supplier.');
+
+Schedule::command('fulfillment:remind-admin')
+    ->everyFiveMinutes()
+    ->timezone('Asia/Jakarta')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->description('Ingatkan admin (WA + email) order lunas yang belum disetup, bertahap sampai diserahkan.');
 
 // ============================================================
 // Provisioning reconciliation (TIDAK dijadwalkan)

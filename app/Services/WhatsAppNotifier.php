@@ -180,6 +180,7 @@ class WhatsAppNotifier
         $paket = $instance->order?->vpsSpec?->name ?? 'VPS Instance';
         $ip = $instance->public_ip ?? 'Pending';
         $port = $instance->ssh_port ?? 22;
+        $sshUser = $instance->ssh_user;
         $os = strtoupper($instance->os ?? 'Ubuntu');
         $password = $instance->initial_root_password ? "`{$instance->initial_root_password}`" : '(Tersimpan di dashboard)';
         $dashboardUrl = "{$appUrl}/dashboard/vps/{$instance->id}";
@@ -195,14 +196,14 @@ class WhatsAppNotifier
             "• *Hostname:* `{$instance->hostname}`",
             "• *IP Public:* `{$ip}`",
             "• *Port SSH:* `{$port}`",
-            "• *Username:* `root`",
-            "• *Password Root:* {$password}",
+            "• *Username:* `{$sshUser}`",
+            "• *Password:* {$password}",
             "• *Sistem Operasi:* {$os}",
             '',
             '💻 *Akses Cepat Terminal (SSH):*',
-            "`ssh root@{$ip} -p {$port}`",
+            "`ssh {$sshUser}@{$ip} -p {$port}`",
             '',
-            '⚠️ _Demi keamanan, segera ganti password root default Anda setelah berhasil masuk pertama kali._',
+            '⚠️ _Demi keamanan, segera ganti password default Anda setelah berhasil masuk pertama kali._',
             '',
             'Kelola server Anda di Dashboard:',
             $dashboardUrl,

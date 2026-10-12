@@ -80,6 +80,13 @@ class InstanceRenewalReminderNotification extends Notification
     protected function content(string $name, string $due, string $graceEnd): array
     {
         return match ($this->stage) {
+            RenewalReminder::STAGE_H7 => [
+                "H-7: Pengingat Perpanjangan {$name}",
+                'PENGINGAT PERPANJANGAN',
+                'Layanan Anda Jatuh Tempo 7 Hari Lagi',
+                "Layanan {$name} akan jatuh tempo pada {$due}. Perpanjang lebih awal agar layanan "
+                    . 'tetap berjalan tanpa jeda dan data Anda aman.',
+            ],
             RenewalReminder::STAGE_H3 => [
                 "H-3: Pengingat Perpanjangan {$name}",
                 'PENGINGAT PERPANJANGAN',

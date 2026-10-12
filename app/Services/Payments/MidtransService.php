@@ -454,24 +454,8 @@ class MidtransService
             );
         }
 
-        // 4. Kirim notifikasi pembayaran ke customer & admin
-        try {
-            $customer = $order->customer;
-            if ($customer) {
-                $customer->notify(new \App\Notifications\PaymentReceivedNotification($order, $order->invoice));
-            }
-        } catch (\Throwable $e) {
-            Log::error('midtrans.sync.notify_customer_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-        }
-
-        try {
-            $adminEmail = env('VEXAHOST_ADMIN_EMAIL', config('mail.from.address'));
-            if ($adminEmail) {
-                \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
-                    ->notify(new \App\Notifications\AdminNewPaidOrderNotification($order));
-            }
-        } catch (\Throwable $e) {
-            Log::error('midtrans.sync.notify_admin_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-        }
+        // 4. Notifikasi pelanggan & admin lewat titik pusat (idempoten, tidak dobel).
+        //    Juga menutup jalur fallback update langsung di atas yang tidak lewat state machine.
+        app(\App\Services\PaymentCompletionService::class)->handle($order->id);
     }
 }

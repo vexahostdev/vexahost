@@ -204,15 +204,9 @@ class AdminController extends Controller
                 }
             }
 
-            // Kirim email konfirmasi pembayaran lunas ke customer (sesuai template resmi)
-            try {
-                $order->loadMissing(['customer', 'vpsSpec', 'invoice']);
-                if ($order->customer) {
-                    $order->customer->notify(new \App\Notifications\PaymentReceivedNotification($order, $order->invoice));
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('admin.approve_payment.notify_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-            }
+            // Email konfirmasi ke pelanggan (+ info admin) dikirim oleh PaymentCompletionService,
+            // dipicu otomatis saat transisi ke 'paid'. Panggilan ini pengaman yang idempoten.
+            app(\App\Services\PaymentCompletionService::class)->handle($order->id);
         } catch (InvalidStateTransitionException $e) {
             return back()->with('error', 'Gagal menyetujui pembayaran: ' . $e->getMessage());
         }
@@ -362,15 +356,9 @@ class AdminController extends Controller
                 );
             });
 
-            // Kirim email konfirmasi pembayaran lunas ke customer
-            try {
-                $order->loadMissing(['customer', 'vpsSpec', 'invoice']);
-                if ($order->customer) {
-                    $order->customer->notify(new \App\Notifications\PaymentReceivedNotification($order, $order->invoice));
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::error('admin.mark_paid.notify_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
-            }
+            // Email lunas ke pelanggan, info admin, dan perpanjangan (bila renewal) lewat
+            // titik pusat. Sudah dipicu otomatis saat transisi; panggilan ini idempoten.
+            app(\App\Services\PaymentCompletionService::class)->handle($order->id);
         } catch (InvalidStateTransitionException $e) {
             return back()->with('error', 'Gagal mark paid: ' . $e->getMessage());
         }
@@ -410,6 +398,7 @@ class AdminController extends Controller
             'public_ip' => 'required|ip',
             'private_ip' => 'nullable|ip',
             'ssh_port' => 'nullable|integer|min:1|max:65535',
+            'ssh_username' => VpsInstance::SSH_USERNAME_RULE,
             'root_password' => 'required|string|min:8|max:128',
         ];
 
@@ -417,7 +406,7 @@ class AdminController extends Controller
         // tidak rusak (mis. "panel.domain.com" tanpa skema menjadi link relatif).
         $rules['app_url'] = [$hasPanel ? 'required' : 'nullable', 'url:http,https', 'max:255'];
 
-        $validated = $request->validate($rules, self::PANEL_URL_MESSAGES);
+        $validated = $request->validate($rules, self::PANEL_URL_MESSAGES + VpsInstance::SSH_USERNAME_MESSAGES);
 
         try {
             $instance = DB::transaction(function () use ($order, $validated, $isDb, $hasPanel) {
@@ -434,7 +423,8 @@ class AdminController extends Controller
                 $order->refresh();
 
                 $spec = $order->vpsSpec;
-                $startsAt = now();
+                // Masa aktif dihitung sejak lunas; lewat SLA 24 jam → sejak diserahkan (kompensasi).
+                $startsAt = $order->provisioningStartsAt();
                 $months = match ($order->billing_cycle) {
                     'quarterly' => 3,
                     'semi_annual' => 6,
@@ -472,6 +462,7 @@ class AdminController extends Controller
                     'public_ip' => $validated['public_ip'],
                     'private_ip' => $validated['private_ip'] ?? null,
                     'ssh_port' => $validated['ssh_port'] ?? 22,
+                    'ssh_username' => VpsInstance::normalizeSshUsername($validated['ssh_username'] ?? null),
                     'initial_root_password' => $rootPassword,
                     'os' => $os,
                     'datacenter_location' => $order->datacenter_location ?? 'ID-CGK01',
@@ -540,6 +531,16 @@ class AdminController extends Controller
                     status: 'completed',
                     userId: Auth::id()
                 );
+
+                if ($order->setupSlaBreached()) {
+                    $instance->logActivity(
+                        action: 'sla_compensation',
+                        description: 'Setup melewati batas ' . Order::SETUP_SLA_HOURS . ' jam sejak pembayaran. '
+                            . 'Sebagai kompensasi, masa aktif dihitung sejak server diserahkan.',
+                        status: 'completed',
+                        userId: Auth::id()
+                    );
+                }
 
                 // Pastikan invoice paid (redundant safety).
                 if ($order->invoice && $order->invoice->status !== 'paid') {
@@ -733,9 +734,10 @@ class AdminController extends Controller
             'auto_provision' => 'nullable|boolean',
             'public_ip' => 'nullable|required_if:auto_provision,1|ip',
             'ssh_port' => 'nullable|integer|min:1|max:65535',
+            'ssh_username' => VpsInstance::SSH_USERNAME_RULE,
             'root_password' => 'nullable|string|min:8',
             'app_url' => ['nullable', 'url:http,https', 'max:255'],
-        ], self::PANEL_URL_MESSAGES);
+        ], self::PANEL_URL_MESSAGES + VpsInstance::SSH_USERNAME_MESSAGES);
 
         $existingOrder = Order::where('shopee_order_id', $validated['shopee_order_id'])->first();
         if ($existingOrder) {
@@ -911,7 +913,8 @@ class AdminController extends Controller
                     ]);
                     $order->refresh();
 
-                    $startsAt = now();
+                    // Masa aktif dihitung sejak lunas; lewat SLA 24 jam → sejak diserahkan (kompensasi).
+                    $startsAt = $order->provisioningStartsAt();
                     $expiresAt = $startsAt->copy()->addMonth();
                     // Tenggang mengikuti jenis produk dan selalu di bawah batas hapus Supplier.
                     $graceEndsAt = $expiresAt->copy()->addDays(app(\App\Services\RenewalService::class)->graceDaysForOrder($order));
@@ -939,6 +942,7 @@ class AdminController extends Controller
                         'public_ip' => $validated['public_ip'],
                         'private_ip' => null,
                         'ssh_port' => $sshPort,
+                        'ssh_username' => VpsInstance::normalizeSshUsername($validated['ssh_username'] ?? null),
                         'initial_root_password' => $rootPassword,
                         'os' => $osLabel,
                         'datacenter_location' => $datacenterLocation === 'singapore' ? 'SG-SIN01' : 'ID-CGK01',
@@ -1060,6 +1064,7 @@ class AdminController extends Controller
             'hostname' => $createdInstance?->hostname ?? $cleanHostname,
             'public_ip' => $createdInstance?->public_ip,
             'ssh_port' => $createdInstance?->ssh_port ?? 22,
+            'ssh_username' => $createdInstance?->ssh_user ?? 'root',
             'root_password' => $createdInstance?->initial_root_password,
             'app_url' => $createdInstance?->app_url,
             'db_engine' => $dbEngine ? strtoupper($dbEngine) : null,
@@ -1329,6 +1334,42 @@ class AdminController extends Controller
     }
 
     /**
+     * Ubah username SSH VPS aktif. Pelanggan otomatis diberi tahu (email + WA + notifikasi dasbor).
+     */
+    public function updateInstanceSshUsername(Request $request, $id)
+    {
+        $validated = $request->validate([
+            'ssh_username' => array_merge(['required'], array_slice(VpsInstance::SSH_USERNAME_RULE, 1)),
+        ], VpsInstance::SSH_USERNAME_MESSAGES);
+
+        $instance = VpsInstance::with('customer')->findOrFail($id);
+        $serverName = $instance->hostname ?? ('#' . $instance->id);
+        $oldUsername = $instance->ssh_user;
+        $newUsername = VpsInstance::normalizeSshUsername($validated['ssh_username']);
+
+        if ($oldUsername === $newUsername) {
+            return back()->with('success', "Username SSH {$serverName} tidak berubah ({$newUsername}).");
+        }
+
+        $instance->update(['ssh_username' => $newUsername]);
+
+        $instance->logActivity(
+            action: 'ssh_username_updated',
+            description: "Username SSH diperbarui tim: {$oldUsername} → {$newUsername}",
+            status: 'completed',
+            userId: Auth::id()
+        );
+
+        try {
+            $instance->customer?->notify(new \App\Notifications\VpsSshUsernameChangedNotification($instance->fresh(), $oldUsername));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('admin.ssh_username.notify_failed', ['instance_id' => $instance->id, 'error' => $e->getMessage()]);
+        }
+
+        return back()->with('success', "Username SSH {$serverName} diubah ke {$newUsername}. Pelanggan sudah diberi tahu.");
+    }
+
+    /**
      * PILAR 2 - Custom Renewal Price Override per-VPS Instance.
      */
     public function updateInstanceRenewalPrice(Request $request, $id)
@@ -1505,7 +1546,7 @@ class AdminController extends Controller
      * (server dibeli retail, tanpa API). Di sini admin mencatat OS/stack yang
      * terpasang dan password root baru, menutup tiket, lalu memberi tahu
      * pelanggan. Password tidak pernah dikirim lewat email: pelanggan melihatnya
-     * di dashboard setelah verifikasi password akun.
+     * di dashboard (tab Akses, ikon mata).
      */
     public function completeReinstall(Request $request, $id)
     {
@@ -1529,12 +1570,17 @@ class AdminController extends Controller
         $rules = [
             'os' => ['required', 'string', Rule::in(array_keys($osOptions))],
             'root_password' => ['required', 'string', 'min:8', 'max:128'],
+            'ssh_username' => VpsInstance::SSH_USERNAME_RULE,
             'message' => ['nullable', 'string', 'max:2000'],
         ];
         if (!$vps->hasFixedStack()) {
             $rules['control_panel'] = ['required', 'string', Rule::in(array_keys($stackOptions))];
         }
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, VpsInstance::SSH_USERNAME_MESSAGES);
+        // Kosong = pertahankan username yang sekarang.
+        $sshUsername = trim((string) ($validated['ssh_username'] ?? '')) !== ''
+            ? VpsInstance::normalizeSshUsername($validated['ssh_username'])
+            : $vps->ssh_user;
 
         $controlPanel = $vps->hasFixedStack() ? $vps->control_panel : $validated['control_panel'];
         $osLabel = $osOptions[$validated['os']];
@@ -1544,11 +1590,11 @@ class AdminController extends Controller
         $customerMessage = trim((string) ($validated['message'] ?? ''));
         if ($customerMessage === '') {
             $customerMessage = "Reinstall OS {$osLabel} untuk server {$serverName} sudah selesai.\n\n"
-                . "Password root baru dapat dilihat di Dashboard > Detail VPS > tab Akses (perlu verifikasi password akun). "
-                . "Setelah login, segera ganti password root dengan perintah passwd.";
+                . "Username SSH: {$sshUsername}. Password baru dapat dilihat di Dashboard > Detail VPS > tab Akses (klik ikon mata). "
+                . "Setelah login, segera ganti password dengan perintah passwd.";
         }
 
-        $completed = DB::transaction(function () use ($ticket, $vps, $validated, $controlPanel, $osLabel, $customerMessage, $ticketCode) {
+        $completed = DB::transaction(function () use ($ticket, $vps, $validated, $controlPanel, $osLabel, $customerMessage, $ticketCode, $sshUsername) {
             // Kunci tiket agar dua admin tidak menyelesaikan permintaan yang sama.
             $lockedTicket = SupportTicket::whereKey($ticket->id)->lockForUpdate()->first();
             if (!$lockedTicket || !$lockedTicket->isOpen()) {
@@ -1559,6 +1605,7 @@ class AdminController extends Controller
             $lockedVps->os = $validated['os'];
             $lockedVps->control_panel = $controlPanel;
             $lockedVps->initial_root_password = $validated['root_password'];
+            $lockedVps->ssh_username = $sshUsername;
             // Reset agar pelanggan melihat password baru sebagai belum pernah dibuka.
             $lockedVps->root_password_revealed_at = null;
             $lockedVps->save();

@@ -104,21 +104,21 @@ class NotificationTemplateSeeder extends Seeder
                 'code' => NotificationTemplate::FULFILLMENT_HANDOVER,
                 'name' => 'Serah Terima Layanan (Salin ke WhatsApp)',
                 'description' => 'Teks seragam untuk menyerahkan akses layanan. Sengaja tanpa kata sandi: '
-                    . 'pelanggan membuat kata sandinya sendiri saat checkout.',
+                    . 'pelanggan melihatnya sendiri di dasbor (tab Akses).',
                 'subject' => 'Layanan {{layanan}} Siap Digunakan',
                 'body' => "Halo {{nama}},\n\n"
                     . "Layanan Anda di VexaHost sudah siap digunakan.\n\n"
                     . "Layanan: {{layanan}}\n"
                     . "Alamat IP: {{ip}}\n"
                     . "Port SSH: {{port_ssh}}\n"
-                    . "Pengguna: root\n"
-                    . "Kata sandi: sesuai yang Anda buat saat pemesanan\n"
+                    . "Pengguna: {{pengguna}}\n"
+                    . "Kata sandi: lihat di dasbor, tab Akses (klik ikon mata)\n"
                     . "Sistem operasi: {{os}}\n"
                     . "{{url_aplikasi}}\n\n"
                     . "Panduan dan detail lengkap dapat dilihat di dasbor: {{dasbor}}\n\n"
                     . "Masa aktif hingga {{masa_aktif}}. Mohon lakukan pencadangan data secara berkala.\n\n"
                     . "Terima kasih,\nTim VexaHost",
-                'variables' => ['nama', 'layanan', 'ip', 'port_ssh', 'os', 'url_aplikasi', 'dasbor', 'masa_aktif'],
+                'variables' => ['nama', 'layanan', 'ip', 'port_ssh', 'pengguna', 'os', 'url_aplikasi', 'dasbor', 'masa_aktif'],
                 'is_active' => true,
             ],
             [

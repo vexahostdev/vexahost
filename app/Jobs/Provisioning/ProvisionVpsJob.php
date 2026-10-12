@@ -72,7 +72,7 @@ class ProvisionVpsJob extends AbstractProvisioningJob
                     'actor_type' => 'system',
                     'metadata' => ['task_id' => $task->id, 'vps_instance_id' => $instance->id],
                     'onLocked' => function (Order $locked) use ($instance) {
-                        $locked->starts_at = $locked->starts_at ?? now();
+                        $locked->starts_at = $locked->starts_at ?? $locked->activationStartsAt();
                         $locked->expires_at = $locked->expires_at ?? $instance->expires_at;
                         $locked->grace_period_ends_at = $locked->grace_period_ends_at ?? $instance->grace_period_ends_at;
                         $locked->save();

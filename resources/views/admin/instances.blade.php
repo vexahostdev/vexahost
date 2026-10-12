@@ -203,6 +203,18 @@
                                 <span class="text-slate-900 font-bold block">{{ $instance->public_ip ?? 'Pending' }}</span>
                                 <span class="text-slate-400 text-[11px] block">{{ $instance->private_ip ?? '-' }}</span>
                                 <span class="text-slate-500 font-sans text-[10px] uppercase block mt-0.5">{{ $instance->provider_label }}</span>
+                                <span class="text-slate-500 text-[11px] block mt-0.5">User SSH: <span class="text-slate-900 font-bold">{{ $instance->ssh_user }}</span></span>
+                                <details class="mt-1 text-[11px] font-sans">
+                                    <summary class="cursor-pointer text-slate-500 hover:text-black font-medium">Ubah username SSH</summary>
+                                    <form action="{{ route('admin.instances.ssh-username', $instance->id) }}" method="POST" class="mt-1.5 flex items-center gap-1.5"
+                                          data-confirm="Ubah username SSH {{ $instance->hostname ?? $instance->id }}? Pelanggan akan menerima email & WA pemberitahuan.">
+                                        @csrf
+                                        <input type="text" name="ssh_username" value="{{ $instance->ssh_user }}" required maxlength="32"
+                                               pattern="[A-Za-z_][A-Za-z0-9._\-]{0,31}" autocomplete="off" spellcheck="false"
+                                               class="w-28 px-2 py-1 rounded border border-slate-300 font-mono-code bg-white focus:outline-none">
+                                        <button type="submit" class="px-2 py-1 rounded bg-black hover:bg-neutral-800 text-white font-bold">Simpan</button>
+                                    </form>
+                                </details>
                             </td>
 
                             <!-- Spesifikasi & Biaya Perpanjangan -->

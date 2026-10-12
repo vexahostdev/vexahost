@@ -337,7 +337,8 @@ Control Panel : {{ $c['control_panel'] }}
 Hostname      : {{ $c['hostname'] }}
 IP Publik     : {{ $c['public_ip'] }}
 Port Akses    : {{ $c['ssh_port'] }}
-Password Root : {{ $c['root_password'] }}
+User SSH      : {{ $c['ssh_username'] ?? 'root' }}
+Password SSH  : {{ $c['root_password'] }}
 @if(!empty($c['app_url']))
 Akses Panel   : {{ $c['app_url'] }}
 @endif
@@ -357,7 +358,7 @@ Tim VexaHost Cloud</div>
             <div x-show="activeMsgTab === 'queued'" style="display: none;" class="bg-black text-white p-4 rounded-lg font-mono-code text-xs leading-relaxed select-all" id="tmpl-queued">Halo Kak {{ $c['customer_name'] }}!
 Terima kasih telah memesan Cloud VPS di VexaHost (No. Pesanan: {{ $c['shopee_order_id'] }}).
 
-Pesanan Anda telah kami terima dan server saat ini sedang dalam proses antrean konfigurasi datacenter (estimasi 5-15 menit).
+Pesanan Anda telah kami terima dan server saat ini sedang dalam proses antrean konfigurasi datacenter (maksimal 1x24 jam, umumnya lebih cepat).
 
 Detail akses akun dashboard Anda:
 --------------------------------------------------
@@ -565,7 +566,13 @@ Terima kasih telah mempercayakan kebutuhan server Anda di VexaHost!</div>
                     </div>
 
                     <div>
-                        <label class="block font-medium text-slate-700 mb-1">Password Root Kustom (Opsional)</label>
+                        <label class="block font-medium text-slate-700 mb-1">Username SSH (Default root)</label>
+                        <input type="text" name="ssh_username" value="{{ old('ssh_username', 'root') }}" maxlength="32" pattern="[A-Za-z_][A-Za-z0-9._\-]{0,31}" autocomplete="off" spellcheck="false"
+                               class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono-code focus:outline-none bg-white">
+                    </div>
+
+                    <div>
+                        <label class="block font-medium text-slate-700 mb-1">Password SSH Kustom (Opsional)</label>
                         <input type="text" name="root_password" x-model="rootPassword" placeholder="Biarkan kosong untuk auto-generate"
                                class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono-code focus:outline-none bg-white">
                     </div>
@@ -660,6 +667,7 @@ Terima kasih telah mempercayakan kebutuhan server Anda di VexaHost!</div>
                                 'hostname' => $instance?->hostname ?? ($so->hostname ?? ('vps-' . ($so->customer->username ?? 'node'))),
                                 'public_ip' => $instance?->public_ip ?? '',
                                 'ssh_port' => $instance?->ssh_port ?? 22,
+                                'ssh_username' => $instance?->ssh_user ?? 'root',
                                 'login_url' => route('login'),
                             ];
                         @endphp
@@ -790,6 +798,7 @@ Control Panel : <span x-text="copyModalData?.control_panel"></span>
 Hostname      : <span x-text="copyModalData?.hostname"></span>
 IP Publik     : <span x-text="copyModalData?.public_ip || '(Dalam proses alokasi)'"></span>
 Port Akses    : <span x-text="copyModalData?.ssh_port || '22'"></span>
+User SSH      : <span x-text="copyModalData?.ssh_username || 'root'"></span>
 --------------------------------------------------
 
 Silakan login ke dashboard untuk mengecek status dan mengelola server Anda.
@@ -802,7 +811,7 @@ Tim VexaHost Cloud</div>
             <div x-show="copyModalTab === 'queued'" style="display: none;" class="bg-black text-white p-4 rounded-lg font-mono-code text-xs leading-relaxed select-all" id="modal-tmpl-queued">Halo Kak <span x-text="copyModalData?.customer_name"></span>!
 Terima kasih telah memesan Cloud VPS di VexaHost (No. Pesanan: <span x-text="copyModalData?.shopee_order_id"></span>).
 
-Pesanan Anda telah kami terima dan server saat ini sedang dalam proses antrean konfigurasi datacenter (estimasi 5-15 menit).
+Pesanan Anda telah kami terima dan server saat ini sedang dalam proses antrean konfigurasi datacenter (maksimal 1x24 jam, umumnya lebih cepat).
 
 Detail akses akun dashboard Anda:
 --------------------------------------------------
@@ -901,10 +910,16 @@ Terima kasih telah mempercayakan kebutuhan server Anda di VexaHost!</div>
                                class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono-code focus:outline-none bg-white">
                     </div>
                     <div>
-                        <label class="block font-medium text-slate-700 mb-1">Password Root <span class="text-rose-600">*</span></label>
-                        <input type="text" name="root_password" required minlength="8" x-model="provRootPassword" placeholder="Password root dari retail"
+                        <label class="block font-medium text-slate-700 mb-1">Username SSH</label>
+                        <input type="text" name="ssh_username" value="root" maxlength="32" pattern="[A-Za-z_][A-Za-z0-9._\-]{0,31}" autocomplete="off" spellcheck="false"
                                class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono-code focus:outline-none bg-white">
                     </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-slate-700 mb-1">Password SSH <span class="text-rose-600">*</span></label>
+                    <input type="text" name="root_password" required minlength="8" x-model="provRootPassword" placeholder="Password dari retail"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono-code focus:outline-none bg-white">
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-2">

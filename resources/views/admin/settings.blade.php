@@ -318,6 +318,22 @@
                     </div>
                 </div>
 
+                <div>
+                    <label class="{{ $labelClass }}">Nomor WhatsApp Admin (Order Lunas &amp; Pengingat Setup)</label>
+                    <input type="text" name="admin_notification_whatsapp" maxlength="200" placeholder="6281234567890, 6289876543210"
+                           value="{{ old('admin_notification_whatsapp', $settings->get('admin_notification_whatsapp', '')) }}"
+                           class="{{ $inputClass }} font-mono-code">
+                    @error('admin_notification_whatsapp') <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p> @enderror
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Boleh lebih dari satu, pisahkan dengan koma. Setiap order lunas langsung dikabarkan ke WA &amp; surel di atas,
+                        lalu diingatkan 30 menit, 1 jam, dan tiap 2 jam sampai layanan diserahkan.
+                        Gunakan nomor yang <strong>berbeda</strong> dari nomor pengirim WA Gateway.
+                    </p>
+                    @if (trim((string) $settings->get('admin_notification_whatsapp', '')) === '')
+                        <p class="text-[11px] text-amber-700 mt-1 font-semibold">⚠ Belum diisi — admin tidak akan menerima notifikasi WhatsApp.</p>
+                    @endif
+                </div>
+
                 <label class="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" name="digest_enabled" value="1"
                            {{ old('digest_enabled', $settings->bool('digest_enabled', true)) ? 'checked' : '' }}
@@ -367,6 +383,19 @@
                     Simpan Pengaturan Notifikasi
                 </button>
             </div>
+        </form>
+
+        <form action="{{ route('admin.settings.notification.test') }}" method="POST"
+              class="bg-white rounded-lg border border-slate-200 px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            @csrf
+            <div>
+                <h3 class="font-bold text-slate-900 text-sm">Tes Notifikasi Admin</h3>
+                <p class="text-xs text-slate-500">Kirim pesan uji ke surel &amp; nomor WA admin yang sudah disimpan.</p>
+            </div>
+            <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold transition-colors">
+                Kirim Tes
+            </button>
         </form>
     </div>
 

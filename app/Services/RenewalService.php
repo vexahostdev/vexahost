@@ -146,7 +146,38 @@ class RenewalService
      */
     public function handleRenewalPayment(\App\Models\Order $order): ?VpsInstance
     {
-        $instance = $order->resolved_instance ?? ($order->vps_instance_id ? VpsInstance::find($order->vps_instance_id) : $order->vpsInstance);
+        // Idempoten: dipanggil dari banyak jalur (webhook, cek status halaman,
+        // verifikasi admin, PaymentCompletionService). Masa aktif hanya boleh
+        // ditambah SEKALI per order, jadi baris order dikunci lalu ditandai.
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($order) {
+            $locked = \App\Models\Order::whereKey($order->id)->lockForUpdate()->first();
+
+            if (!$locked) {
+                return null;
+            }
+
+            if ($locked->renewal_applied_at) {
+                $order->setRawAttributes($locked->getAttributes(), true);
+
+                return $locked->resolved_instance
+                    ?? ($locked->vps_instance_id ? VpsInstance::find($locked->vps_instance_id) : null);
+            }
+
+            $instance = $this->applyRenewal($locked);
+
+            if ($instance) {
+                $locked->forceFill(['renewal_applied_at' => now()])->save();
+            }
+
+            $order->setRawAttributes($locked->fresh()->getAttributes(), true);
+
+            return $instance;
+        });
+    }
+
+    private function applyRenewal(\App\Models\Order $order): ?VpsInstance
+    {
+        $instance =$order->resolved_instance ?? ($order->vps_instance_id ? VpsInstance::find($order->vps_instance_id) : $order->vpsInstance);
         if (!$instance) {
             \Illuminate\Support\Facades\Log::warning('Renewal order paid but no vps_instance found', [
                 'order_id' => $order->id,
@@ -155,9 +186,12 @@ class RenewalService
             return null;
         }
 
-        $baseDate = ($instance->expires_at && $instance->expires_at->isFuture())
+        // Patokan = waktu pelunasan (bukan waktu diproses), agar perpanjangan yang
+        // diterapkan terlambat tidak menggeser jatuh tempo. Sisa masa aktif tetap utuh.
+        $paidAt = $order->activationStartsAt();
+        $baseDate = ($instance->expires_at && $instance->expires_at->greaterThan($paidAt))
             ? $instance->expires_at->copy()
-            : now();
+            : $paidAt;
 
         $cycle = $order->billing_cycle ?? $instance->billing_cycle ?? 'monthly';
         $months = match ($cycle) {

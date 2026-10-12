@@ -245,7 +245,7 @@
                                         <span class="text-[11px] text-slate-500 font-mono-code">Order #{{ $order->id }}</span>
                                     </div>
                                     <p class="text-[11px] text-slate-500 leading-relaxed">
-                                        Pesanan telah terverifikasi. Server sedang dalam proses alokasi dan instalasi oleh tim VexaHost. Estimasi: 15-60 menit.
+                                        Pesanan telah terverifikasi. Server sedang dalam proses alokasi dan instalasi oleh tim VexaHost. Maksimal 1×24 jam sejak pembayaran (umumnya lebih cepat).
                                     </p>
                                 </div>
 
@@ -507,7 +507,7 @@
                             </svg>
                             <span>Server Sedang Dalam Antrean Setup</span>
                         </div>
-                        Pesanan Anda telah masuk ke tim teknis VexaHost untuk alokasi resource dan konfigurasi (estimasi 15-60 menit). Kredensial server (IP Publik, SSH, Root Password) akan otomatis dikirimkan ke email Anda begitu setup selesai.
+                        Pesanan Anda telah masuk ke tim teknis VexaHost untuk alokasi resource dan konfigurasi (maksimal 1×24 jam sejak pembayaran, umumnya lebih cepat). Kredensial server (IP Publik, SSH, Root Password) akan otomatis dikirimkan ke email Anda begitu setup selesai.
                     </div>
                 </div>
             `,

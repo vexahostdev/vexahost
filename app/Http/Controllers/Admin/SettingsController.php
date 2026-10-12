@@ -135,12 +135,14 @@ class SettingsController extends Controller
     {
         $validated = $request->validate([
             'admin_notification_email' => ['required', 'email', 'max:120'],
+            'admin_notification_whatsapp' => ['nullable', 'string', 'max:200', 'regex:/^[0-9+\s,;\-]*$/'],
             'digest_enabled' => ['nullable'],
             'fulfillment_sla_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
             'renewal_grace_days_vps' => ['required', 'integer', 'min:1', 'max:6'],
             'renewal_grace_days_database' => ['required', 'integer', 'min:1', 'max:29'],
             'renewal_grace_days_app' => ['required', 'integer', 'min:1', 'max:29'],
         ], [
+            'admin_notification_whatsapp.regex' => 'Nomor WA admin hanya boleh berisi angka, +, spasi, atau koma sebagai pemisah.',
             'renewal_grace_days_vps.max' => 'Tenggang VPS wajib di bawah 7 hari, karena Supplier menghapus VPS pada hari ke-7.',
             'renewal_grace_days_database.max' => 'Tenggang database wajib di bawah 30 hari, mengikuti batas Supplier.',
             'renewal_grace_days_app.max' => 'Tenggang aplikasi wajib di bawah 30 hari, mengikuti batas Supplier.',
@@ -148,6 +150,7 @@ class SettingsController extends Controller
 
         $this->settings->setMany([
             'admin_notification_email' => $validated['admin_notification_email'],
+            'admin_notification_whatsapp' => trim((string) ($validated['admin_notification_whatsapp'] ?? '')),
             'fulfillment_sla_minutes' => $validated['fulfillment_sla_minutes'],
             'renewal_grace_days_vps' => $validated['renewal_grace_days_vps'],
             'renewal_grace_days_database' => $validated['renewal_grace_days_database'],
@@ -164,6 +167,21 @@ class SettingsController extends Controller
         $this->audit('settings.notification_updated', 'Memperbarui pengaturan notifikasi.');
 
         return back()->with('success', 'Pengaturan notifikasi berhasil diperbarui.');
+    }
+
+    /**
+     * Kirim pesan uji ke email & WA admin agar bisa dipastikan notifikasi order sampai.
+     */
+    public function testNotification(\App\Services\AdminAlertService $alerts)
+    {
+        $result = $alerts->test();
+
+        $this->audit('settings.notification_tested', 'Mengirim tes notifikasi admin.');
+
+        $status = fn (bool $ok) => $ok ? 'terkirim' : 'GAGAL / belum diatur';
+        $message = "Tes notifikasi — Email: {$status($result['email'])}, WhatsApp: {$status($result['whatsapp'])}.";
+
+        return back()->with($result['email'] && $result['whatsapp'] ? 'success' : 'error', $message);
     }
 
     /**

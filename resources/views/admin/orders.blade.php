@@ -329,7 +329,14 @@
                 </div>
 
                 <div>
-                    <label class="block font-bold text-slate-800 mb-1">Root Password Server <span class="text-rose-600">*</span></label>
+                    <label class="block font-bold text-slate-800 mb-1">Username SSH</label>
+                    <input type="text" name="ssh_username" value="root" maxlength="32" pattern="[A-Za-z_][A-Za-z0-9._\-]{0,31}" autocomplete="off" spellcheck="false"
+                           class="w-full px-3 py-2 rounded-lg border border-slate-300 font-mono-code focus:outline-none focus:ring-1 focus:ring-black">
+                    <p class="text-[11px] text-slate-400 mt-0.5">Default <code>root</code>. Ganti bila supplier memberi user lain (mis. <code>ubuntu</code>).</p>
+                </div>
+
+                <div>
+                    <label class="block font-bold text-slate-800 mb-1">Password SSH Server <span class="text-rose-600">*</span></label>
                     <div class="relative">
                         <input id="modalRootPassword" :type="showRootPassword ? 'text' : 'password'" name="root_password" required minlength="8" x-model="rootPassword" placeholder="Masukkan password root dari retail (min 8 karakter)"
                                class="w-full px-3 py-2 pr-20 rounded-lg border border-slate-300 font-mono-code focus:outline-none focus:ring-1 focus:ring-black">

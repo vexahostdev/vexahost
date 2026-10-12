@@ -17,7 +17,9 @@ use Illuminate\Support\Facades\Notification;
 /**
  * PHASE 3 - Pengingat perpanjangan dan perpindahan siklus hidup layanan.
  *
- * Empat tahap: H-3, H-1, jatuh tempo, dan akhir tenggang.
+ * Lima tahap: H-7, H-3, H-1, jatuh tempo, dan akhir tenggang.
+ * H-7 sengaja ada agar pelanggan membayar sebelum perpanjangan di Supplier
+ * (auto-renew Supplier dimatikan; Supplier biasanya menagih H-3).
  *
  * Idempotensi dijamin oleh indeks unik (vps_instance_id, stage, period_expires_at)
  * di tabel renewal_reminders. Bila command berjalan dua kali, penulisan kedua
@@ -31,7 +33,7 @@ class SendRenewalRemindersCommand extends Command
     protected $signature = 'renewal:remind
         {--dry-run : Hanya tampilkan rencana tindakan, tidak mengirim apa pun}';
 
-    protected $description = 'Kirim pengingat perpanjangan H-3/H-1/H-0 dan pindahkan status instance yang jatuh tempo.';
+    protected $description = 'Kirim pengingat perpanjangan H-7/H-3/H-1/H-0 dan pindahkan status instance yang jatuh tempo.';
 
     public function __construct(
         protected RenewalService $renewal,
@@ -45,12 +47,14 @@ class SendRenewalRemindersCommand extends Command
         $dry = (bool) $this->option('dry-run');
 
         $digest = [
+            'h_minus_7' => [],
             'h_minus_3' => [],
             'h_minus_1' => [],
             'h_zero' => [],
             'grace_ended' => [],
         ];
 
+        $this->processUpcoming(RenewalReminder::STAGE_H7, 7, $dry, $digest);
         $this->processUpcoming(RenewalReminder::STAGE_H3, 3, $dry, $digest);
         $this->processUpcoming(RenewalReminder::STAGE_H1, 1, $dry, $digest);
         $this->processDue($dry, $digest);
@@ -211,7 +215,9 @@ class SendRenewalRemindersCommand extends Command
             return;
         }
 
-        $email = $this->settings->get('admin_notification_email');
+        $this->sendAdminDigestWhatsApp($digest);
+
+        $email = app(\App\Services\AdminAlertService::class)->adminEmail();
 
         if (!$email) {
             $this->warn('Surel penerima digest admin belum diatur. Digest tidak dikirim.');
@@ -227,6 +233,37 @@ class SendRenewalRemindersCommand extends Command
         } catch (\Throwable $e) {
             Log::error('renewal.digest_failed', ['error' => $e->getMessage()]);
             $this->error("Digest admin gagal dikirim: {$e->getMessage()}");
+        }
+    }
+
+    /**
+     * Ringkasan singkat ke WA admin (rincian lengkap tetap di surel digest).
+     */
+    protected function sendAdminDigestWhatsApp(array $digest): void
+    {
+        $labels = [
+            'h_minus_7' => 'Jatuh tempo 7 hari lagi',
+            'h_minus_3' => 'Jatuh tempo 3 hari lagi',
+            'h_minus_1' => 'Jatuh tempo besok',
+            'h_zero' => 'Jatuh tempo hari ini — disuspend',
+            'grace_ended' => 'Tenggang berakhir — diterminasi',
+        ];
+
+        $lines = ['📅 *RINGKASAN PERPANJANGAN HARI INI*', ''];
+
+        foreach ($labels as $key => $label) {
+            foreach ($digest[$key] ?? [] as $row) {
+                $lines[] = "• {$label}: {$row['hostname']} · {$row['customer']} · jatuh tempo {$row['expires_at']}";
+            }
+        }
+
+        $lines[] = '';
+        $lines[] = '_Ingat: jangan perpanjang di Supplier sebelum pelanggan membayar. VPS terminated = hentikan juga di Supplier._';
+
+        try {
+            app(\App\Services\AdminAlertService::class)->whatsAppOnly(implode("\n", $lines), 'renewal_digest');
+        } catch (\Throwable $e) {
+            Log::error('renewal.digest_whatsapp_failed', ['error' => $e->getMessage()]);
         }
     }
 

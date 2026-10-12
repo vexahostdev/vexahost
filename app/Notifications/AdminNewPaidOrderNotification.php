@@ -25,8 +25,10 @@ class AdminNewPaidOrderNotification extends Notification
         $spec = $this->order->vpsSpec->name ?? 'VPS';
         $amount = 'Rp ' . number_format((float) $this->order->amount, 0, ',', '.');
 
+        $label = $this->order->isRenewal() ? 'PERPANJANGAN LUNAS' : 'ORDER LUNAS — PERLU SETUP';
+
         return (new MailMessage)
-            ->subject("💰 [ORDER LUNAS] Order #{$this->order->id} — {$spec} ({$amount})")
+            ->subject("💰 [{$label}] Order #{$this->order->id} — {$spec} ({$amount})")
             ->view('emails.admin-new-order', [
                 'order' => $this->order,
             ]);

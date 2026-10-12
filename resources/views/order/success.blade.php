@@ -184,7 +184,7 @@
                         </div>
 
                         <div class="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-800">
-                            <span class="font-semibold">Catatan:</span> Password root dapat dilihat melalui menu detail VPS di Dashboard dengan verifikasi password akun Anda.
+                            <span class="font-semibold">Catatan:</span> Username &amp; password SSH dapat dilihat di menu detail VPS pada Dashboard (tab Akses, klik ikon mata).
                         </div>
                     </div>
                 @elseif($isPaid)
@@ -192,7 +192,7 @@
                     <div class="pt-4 bg-cyan-50 p-5 rounded-lg border border-cyan-200 text-center">
                         <svg class="w-8 h-8 text-cyan-500 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         <p class="text-sm font-semibold text-cyan-800">Server Sedang Di-Setup</p>
-                        <p class="text-xs text-cyan-700 mt-1">Pembayaran telah dikonfirmasi lunas. Tim teknis kami sedang mempersiapkan VPS Anda. Kredensial akses server akan tersedia di Dashboard setelah proses setup selesai (estimasi 1-2 jam kerja).</p>
+                        <p class="text-xs text-cyan-700 mt-1">Pembayaran telah dikonfirmasi lunas. Tim teknis kami sedang mempersiapkan VPS Anda. Kredensial akses server akan tersedia di Dashboard setelah proses setup selesai (maksimal 1×24 jam sejak pembayaran, umumnya lebih cepat). Anda juga akan menerima email &amp; WhatsApp saat server siap.</p>
                     </div>
                 @else
                     {{-- Belum bayar --}}

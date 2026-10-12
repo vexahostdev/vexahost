@@ -139,11 +139,19 @@
                         </div>
 
                         <div>
-                            <label class="block font-medium text-slate-700 mb-1">Password root baru</label>
+                            <label class="block font-medium text-slate-700 mb-1">Username SSH</label>
+                            <input type="text" name="ssh_username" value="{{ old('ssh_username', $ticket->vpsInstance?->ssh_user ?? 'root') }}" maxlength="32" pattern="[A-Za-z_][A-Za-z0-9._\-]{0,31}" autocomplete="off" spellcheck="false"
+                                   class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono-code focus:outline-none">
+                            <p class="mt-1 text-slate-400">Biarkan bila username tidak berubah setelah reinstall.</p>
+                            @error('ssh_username') <p class="mt-1 text-red-600">{{ $message }}</p> @enderror
+                        </div>
+
+                        <div>
+                            <label class="block font-medium text-slate-700 mb-1">Password SSH baru</label>
                             <input type="text" name="root_password" required minlength="8" maxlength="128" autocomplete="off" spellcheck="false"
                                    class="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white font-mono-code focus:outline-none"
                                    placeholder="Password root dari dashboard supplier">
-                            <p class="mt-1 text-slate-400">Disimpan terenkripsi. Pelanggan membukanya dengan verifikasi password akun.</p>
+                            <p class="mt-1 text-slate-400">Disimpan terenkripsi. Pelanggan membukanya lewat ikon mata di tab Akses.</p>
                             @error('root_password') <p class="mt-1 text-red-600">{{ $message }}</p> @enderror
                         </div>
 

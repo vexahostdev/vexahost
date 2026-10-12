@@ -43,6 +43,7 @@ class VpsInstance extends Model
         'public_ip',
         'private_ip',
         'ssh_port',
+        'ssh_username',
         'initial_root_password',
         'root_password_revealed_at',
         'os',
@@ -276,11 +277,36 @@ class VpsInstance extends Model
         ]);
     }
 
+    /**
+     * Aturan validasi username SSH (dipakai semua form admin & API).
+     * Huruf/angka/titik/garis bawah/strip, diawali huruf atau garis bawah, maks 32.
+     */
+    public const SSH_USERNAME_RULE = ['nullable', 'string', 'max:32', 'regex:/^[A-Za-z_][A-Za-z0-9._-]{0,31}$/'];
+
+    public const SSH_USERNAME_MESSAGES = [
+        'ssh_username.regex' => 'Username SSH hanya boleh huruf, angka, titik, garis bawah, atau strip, dan harus diawali huruf.',
+        'ssh_username.max' => 'Username SSH maksimal 32 karakter.',
+    ];
+
+    /** Nilai kosong selalu kembali ke 'root' agar tidak pernah tersimpan username kosong. */
+    public static function normalizeSshUsername(?string $username): string
+    {
+        $username = trim((string) $username);
+
+        return $username !== '' ? $username : 'root';
+    }
+
+    /** Username login SSH. VPS lama (sebelum kolom ada) otomatis 'root'. */
+    public function getSshUserAttribute(): string
+    {
+        return self::normalizeSshUsername($this->ssh_username ?? null);
+    }
+
     public function getSshCommandAttribute(): string
     {
         $port = $this->ssh_port ?: 22;
         $ip = $this->public_ip ?: '0.0.0.0';
-        return "ssh root@{$ip} -p {$port}";
+        return "ssh {$this->ssh_user}@{$ip} -p {$port}";
     }
 
     public function getStatusBadgeAttribute(): array

@@ -7,11 +7,10 @@
     reinstallModal: {{ $errors->hasAny(['os', 'control_panel', 'confirm_hostname', 'notes']) ? 'true' : 'false' }},
     rebootGuideModal: false,
     unreachableModal: {{ $errors->has('description') ? 'true' : 'false' }},
-    passwordModal: false,
-    challengePassword: '',
-    passwordError: '',
     passwordLoading: false,
+    passwordError: '',
     revealedPassword: '',
+    showPassword: false,
     revealedAt: '{{ $vps->root_password_revealed_at ? $vps->root_password_revealed_at->timezone('Asia/Jakarta')->format('d M Y H:i:s') : '' }}',
     showDbPassword: false,
     copyText(text) {
@@ -19,16 +18,23 @@
         navigator.clipboard.writeText(text);
         showAlert('Teks disalin ke clipboard: ' + text, { icon: 'success', title: 'Berhasil disalin' });
     },
-    openPasswordModal() {
-        this.challengePassword = '';
-        this.passwordError = '';
-        this.passwordModal = true;
+    copySecret(text) {
+        if (!text) return;
+        navigator.clipboard.writeText(text);
+        showAlert('Password disalin ke clipboard.', { icon: 'success', title: 'Berhasil disalin' });
     },
-    async submitPasswordChallenge() {
-        if (!this.challengePassword) {
-            this.passwordError = 'Masukkan password akun Anda.';
+    // Ikon mata: klik = tampil, klik lagi = sembunyi. Password diambil dari server
+    // (terenkripsi di database) hanya saat pertama kali dibuka, lalu disimpan di memori halaman.
+    async togglePassword() {
+        if (this.showPassword) {
+            this.showPassword = false;
             return;
         }
+        if (this.revealedPassword) {
+            this.showPassword = true;
+            return;
+        }
+        if (this.passwordLoading) return;
         this.passwordLoading = true;
         this.passwordError = '';
         try {
@@ -40,22 +46,25 @@
                     'X-CSRF-TOKEN': token,
                     'Accept': 'application/json'
                 },
-                body: JSON.stringify({ password: this.challengePassword })
+                body: JSON.stringify({})
             });
-            const data = await res.json();
-            if (res.ok && data.success) {
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success && data.password) {
                 this.revealedPassword = data.password;
-                this.revealedAt = data.revealed_at;
-                this.passwordModal = false;
-                this.activeTab = 'access';
+                this.revealedAt = data.revealed_at || this.revealedAt;
+                this.showPassword = true;
             } else {
-                this.passwordError = data.message || 'Verifikasi password akun gagal.';
+                this.passwordError = data.message || 'Password belum tersedia. Silakan hubungi support.';
             }
         } catch (err) {
             this.passwordError = 'Terjadi kesalahan sistem. Silakan coba lagi.';
         } finally {
             this.passwordLoading = false;
         }
+    },
+    async revealFromGuide() {
+        this.activeTab = 'access';
+        if (!this.showPassword) await this.togglePassword();
     }
 }">
     <!-- Back to Instances -->
@@ -544,7 +553,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                     </div>
                 </div>
                 <p class="text-[11px] text-slate-500">
-                    Disarankan menggunakan SSH Tunneling (<code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-800 font-mono-code">ssh -L {{ $dbPort }}:localhost:{{ $dbPort }} root&#64;{{ $dbHost }}</code>) untuk keamanan maksimal di lingkungan production.
+                    Disarankan menggunakan SSH Tunneling (<code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-800 font-mono-code">ssh -L {{ $dbPort }}:localhost:{{ $dbPort }} {{ $vps->ssh_user }}&#64;{{ $dbHost }}</code>) untuk keamanan maksimal di lingkungan production.
                 </p>
             </div>
         </div>
@@ -646,9 +655,9 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                 <ol class="grid gap-3 md:grid-cols-3 text-xs">
                     <li class="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
                         <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black text-white font-bold">1</span>
-                        <p class="font-semibold text-slate-900">Ambil password root</p>
-                        <p class="text-slate-500">Butuh verifikasi password akun VexaHost Anda.</p>
-                        <button type="button" @click="openPasswordModal()" class="px-3 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white font-semibold">
+                        <p class="font-semibold text-slate-900">Ambil password SSH</p>
+                        <p class="text-slate-500">Username: <span class="font-mono-code font-semibold text-slate-900">{{ $vps->ssh_user }}</span>. Klik untuk melihat password di tab Akses.</p>
+                        <button type="button" @click="revealFromGuide()" class="px-3 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white font-semibold">
                             Tampilkan Password
                         </button>
                     </li>
@@ -663,7 +672,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                     </li>
                     <li class="p-4 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
                         <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-black text-white font-bold">3</span>
-                        <p class="font-semibold text-slate-900">Ganti password root</p>
+                        <p class="font-semibold text-slate-900">Ganti password</p>
                         <p class="text-slate-500">Setelah diganti, simpan password baru Anda sendiri. Password awal di panel tidak berlaku lagi.</p>
                         <div class="flex items-center justify-between gap-2 p-2 rounded bg-black text-white font-mono-code text-[11px]">
                             <span>passwd</span>
@@ -758,10 +767,10 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-base font-bold text-slate-900">Kredensial Akses SSH</h3>
-                    <p class="text-xs text-slate-500 mt-0.5">Kredensial root dienkripsi dengan standar AES-256-CBC at rest.</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Password disimpan terenkripsi (AES-256) dan hanya dibuka saat Anda menekan ikon mata.</p>
                 </div>
                 <span class="px-2.5 py-1 rounded text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-300">
-                    Port 22 (SSH)
+                    Port {{ $vps->ssh_port ?: 22 }} (SSH)
                 </span>
             </div>
 
@@ -782,40 +791,45 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                 </div>
 
                 <div class="flex justify-between items-center py-2">
-                    <span class="text-slate-500 font-medium">Username Root:</span>
-                    <span class="font-mono-code text-slate-900 font-bold">root</span>
+                    <span class="text-slate-500 font-medium">Username SSH:</span>
+                    <div class="flex items-center gap-2">
+                        <span class="font-mono-code text-slate-900 font-bold">{{ $vps->ssh_user }}</span>
+                        <button @click="copyText(@js($vps->ssh_user))" class="p-1 rounded text-slate-400 hover:text-black hover:bg-slate-100" title="Salin username">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        </button>
+                    </div>
                 </div>
 
-                <!-- Secure Root Password Section -->
+                <!-- Password SSH: ikon mata (tampil/sembunyi) -->
                 <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-3 gap-2">
                     <div>
-                        <span class="text-slate-500 font-medium block">Password Root Awal:</span>
-                        <span class="text-[11px] text-slate-400 block">Memerlukan verifikasi password akun sebelum ditampilkan.</span>
+                        <span class="text-slate-500 font-medium block">Password SSH Awal:</span>
+                        <span class="text-[11px] text-slate-400 block">Klik ikon mata untuk menampilkan atau menyembunyikan.</span>
                         <span class="text-[11px] text-slate-400 block">Jika Anda sudah menggantinya lewat <code class="font-mono-code">passwd</code>, password ini tidak berlaku lagi.</span>
                     </div>
 
-                    <div class="flex items-center gap-2">
-                        <template x-if="!revealedPassword">
-                            <div class="flex items-center gap-2">
-                                <span class="font-mono-code text-slate-400 font-bold tracking-widest text-sm bg-slate-50 px-3 py-1.5 rounded border border-slate-200">
-                                    ••••••••••••••••
-                                </span>
-                                <button @click="openPasswordModal()" class="px-3.5 py-1.5 rounded-lg bg-black hover:bg-neutral-800 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                                    Tampilkan Password
-                                </button>
-                            </div>
-                        </template>
+                    <div class="flex flex-col items-start sm:items-end gap-1">
+                        <div class="flex items-center gap-2">
+                            <span x-show="!showPassword" class="font-mono-code text-slate-400 font-bold tracking-widest text-sm bg-slate-50 px-3 py-1.5 rounded border border-slate-200">
+                                ••••••••••••••••
+                            </span>
+                            <span x-show="showPassword" style="display: none;" class="font-mono-code font-bold text-sm bg-emerald-50 text-emerald-900 px-3 py-1.5 rounded border border-emerald-200 select-all break-all" x-text="revealedPassword"></span>
 
-                        <template x-if="revealedPassword">
-                            <div class="flex items-center gap-2">
-                                <span class="font-mono-code font-bold text-slate-900 text-sm bg-emerald-50 text-emerald-900 px-3 py-1.5 rounded border border-emerald-200 select-all" x-text="revealedPassword"></span>
-                                <button @click="copyText(revealedPassword)" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-900">
-                                    Salin
-                                </button>
-                                <span class="text-[11px] text-slate-400" x-text="'Diakses: ' + revealedAt"></span>
-                            </div>
-                        </template>
+                            <button type="button" @click="togglePassword()" :disabled="passwordLoading"
+                                    :title="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+                                    :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+                                    class="p-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 disabled:opacity-50 transition-colors">
+                                <svg x-show="passwordLoading" style="display: none;" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                                <svg x-show="!passwordLoading && !showPassword" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                <svg x-show="!passwordLoading && showPassword" style="display: none;" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/></svg>
+                            </button>
+
+                            <button type="button" x-show="showPassword" style="display: none;" @click="copySecret(revealedPassword)" class="px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-100 text-xs font-semibold text-slate-900">
+                                Salin
+                            </button>
+                        </div>
+                        <span x-show="passwordError" style="display: none;" class="text-[11px] text-red-600 font-medium" x-text="passwordError"></span>
+                        <span x-show="showPassword && revealedAt" style="display: none;" class="text-[11px] text-slate-400" x-text="'Terakhir dibuka: ' + revealedAt"></span>
                     </div>
                 </div>
 
@@ -866,7 +880,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                             </p>
                         </div>
                         <p class="text-[11px] text-slate-500">
-                            Disarankan menggunakan SSH Tunneling (<code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-800 font-mono-code">ssh -L 5432:localhost:5432 root&#64;{{ $vps->public_ip }}</code>) untuk keamanan maksimal.
+                            Disarankan menggunakan SSH Tunneling (<code class="bg-white px-1 py-0.5 rounded border border-slate-200 text-slate-800 font-mono-code">ssh -L 5432:localhost:5432 {{ $vps->ssh_user }}&#64;{{ $vps->public_ip }}</code>) untuk keamanan maksimal.
                         </p>
                     </div>
                 @endif
@@ -1019,7 +1033,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
 
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3">
                     <div>
-                        <p class="font-semibold text-slate-900">Ganti password root</p>
+                        <p class="font-semibold text-slate-900">Ganti password SSH</p>
                         <p class="text-slate-500">Lakukan sendiri: login SSH lalu jalankan <code class="font-mono-code">passwd</code>.</p>
                     </div>
                     <button type="button" @click="copyText('passwd')" class="px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100 font-semibold text-slate-900 self-start sm:self-auto">Salin Perintah</button>
@@ -1040,7 +1054,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-3">
                     <div>
                         <p class="font-semibold text-slate-900">Install ulang OS (reinstall)</p>
-                        <p class="text-slate-500">Seluruh data terhapus. Tim memasang OS baru dan password root baru muncul di dashboard.</p>
+                        <p class="text-slate-500">Seluruh data terhapus. Tim memasang OS baru dan password SSH baru muncul di dashboard.</p>
                     </div>
                     @if(isset($openRequests['reinstall']))
                         <a href="{{ route('dashboard.support.show', $openRequests['reinstall']->id) }}" class="px-3 py-1.5 rounded-lg border border-blue-200 bg-blue-50 text-blue-800 font-semibold self-start sm:self-auto">Sedang Diproses</a>
@@ -1184,53 +1198,13 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
         </div>
     </div>
 
-    <!-- Security Challenge Modal: Password Reveal -->
-    <div x-show="passwordModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" style="display: none;">
-        <div class="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full shadow-xl" @click.away="passwordModal = false">
-            <div class="flex items-start gap-3 mb-3">
-                <div class="w-10 h-10 rounded-lg bg-slate-100 text-slate-900 flex items-center justify-center shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                </div>
-                <div>
-                    <h3 class="text-base font-bold text-slate-900">Verifikasi Keamanan Akun</h3>
-                    <p class="text-xs text-slate-500">Masukkan password akun Anda untuk mendekripsi dan menampilkan kredensial root instance.</p>
-                </div>
-            </div>
-
-            <template x-if="passwordError">
-                <div class="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs font-medium" x-text="passwordError"></div>
-            </template>
-
-            <form @submit.prevent="submitPasswordChallenge()" class="space-y-4 text-xs">
-                <div>
-                    <label class="block font-medium text-slate-700 mb-1">Password Akun VexaHost Anda</label>
-                    <input type="password" x-model="challengePassword" required placeholder="Masukkan password login Anda..." class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-black bg-white">
-                </div>
-
-                <p class="text-[11px] text-slate-500">
-                    Akses ini akan dicatat ke dalam audit trail keamanan server bersama IP address Anda.
-                </p>
-
-                <div class="pt-2 flex items-center justify-end gap-2">
-                    <button type="button" @click="passwordModal = false" class="px-4 py-2 rounded-lg text-slate-700 hover:bg-slate-100 font-medium">
-                        Batal
-                    </button>
-                    <button type="submit" :disabled="passwordLoading" class="px-4 py-2 rounded-lg bg-black hover:bg-neutral-800 text-white font-bold flex items-center gap-1.5 transition-colors">
-                        <span x-show="!passwordLoading">Konfirmasi & Buka</span>
-                        <span x-show="passwordLoading">Memverifikasi...</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
     @php $serverName = $vps->hostname ?? ('VPS-' . $vps->id); @endphp
 
     <!-- Modal: Panduan Reboot lewat SSH -->
     <div x-show="rebootGuideModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" style="display: none;">
         <div class="bg-white rounded-lg border border-slate-200 p-6 max-w-md w-full shadow-xl max-h-[90vh] overflow-y-auto" @click.away="rebootGuideModal = false">
             <h3 class="text-base font-bold text-slate-900 mb-1">Cara Restart Server</h3>
-            <p class="text-xs text-slate-500 mb-4">Anda memegang akses root, jadi restart bisa dilakukan sendiri dan langsung berjalan.</p>
+            <p class="text-xs text-slate-500 mb-4">Anda memegang akses penuh ke server, jadi restart bisa dilakukan sendiri dan langsung berjalan.</p>
 
             <ol class="space-y-3 text-xs">
                 <li>
@@ -1379,7 +1353,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                     </div>
 
                     <p class="text-[11px] text-slate-500">
-                        Setelah selesai, password root baru tampil di tab Akses dan Anda menerima email pemberitahuan.
+                        Setelah selesai, password SSH baru tampil di tab Akses dan Anda menerima email pemberitahuan.
                     </p>
 
                     <div class="pt-2 flex items-center justify-end gap-2">

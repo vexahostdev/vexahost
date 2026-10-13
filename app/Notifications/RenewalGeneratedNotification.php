@@ -11,6 +11,7 @@ use Illuminate\Notifications\Notification;
 class RenewalGeneratedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Subscription $subscription,
@@ -27,7 +28,7 @@ class RenewalGeneratedNotification extends Notification
         $spec = $this->subscription->vpsSpec?->name ?? 'VPS';
         $amount = 'Rp ' . number_format((float) $this->invoice->amount, 0, ',', '.');
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("Invoice perpanjangan {$spec} — {$this->invoice->invoice_number}")
             ->greeting("Halo {$notifiable->full_name},")
             ->line("Invoice perpanjangan {$spec} telah dibuat.")

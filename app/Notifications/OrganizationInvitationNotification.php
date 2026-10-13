@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class OrganizationInvitationNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(public OrganizationInvitation $invitation) {}
 
@@ -24,7 +25,7 @@ class OrganizationInvitationNotification extends Notification
         $role = $this->invitation->role;
         $url = url('/invitations/' . $this->invitation->token);
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("Undangan bergabung ke {$org->name}")
             ->line("Anda diundang bergabung ke organisasi {$org->name} di VexaHost sebagai {$role->name}.")
             ->action('Terima Undangan', $url)

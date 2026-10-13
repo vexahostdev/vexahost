@@ -416,8 +416,8 @@ class DashboardController extends Controller
     {
         try {
             $ticket->loadMissing('customer');
-            $adminEmail = app(\App\Services\AdminAlertService::class)->adminEmail();
-            if ($adminEmail) {
+            $adminEmails = \App\Support\MailIdentity::adminRecipients();
+            foreach ($adminEmails as $adminEmail) {
                 \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                     ->notify(new \App\Notifications\AdminTicketNotification($ticket, $message, $eventType));
             }

@@ -49,7 +49,7 @@
                     <div>
                         <span class="text-xl font-black uppercase tracking-tight text-black block">VexaHost Cloud Infrastructure</span>
                         <p class="text-[11px] text-neutral-600 font-medium">Enterprise Cloud Hosting &amp; Infrastructure Services</p>
-                        <p class="text-[10px] text-neutral-500">Jakarta Data Center Hub &bull; {{ config('mail.from.address', 'vexahostcloudtech@gmail.com') }} &bull; https://vexahostcloud.my.id</p>
+                        <p class="text-[10px] text-neutral-500">Jakarta Data Center Hub &bull; {{ \App\Support\MailIdentity::contactEmail() }} &bull; https://vexahostcloud.my.id</p>
                     </div>
                 </div>
                 <div class="text-right">
@@ -90,7 +90,7 @@
                     @if($vxSettings->get('company_npwp'))
                         <p class="text-neutral-600">NPWP: {{ $vxSettings->get('company_npwp') }}</p>
                     @endif
-                    <p class="text-neutral-600">Email: {{ $vxSettings->get('company_email') ?: config('mail.from.address', 'vexahostcloudtech@gmail.com') }}</p>
+                    <p class="text-neutral-600">Email: {{ $vxSettings->get('company_email') ?: \App\Support\MailIdentity::contactEmail() }}</p>
                     <p class="text-neutral-600">Website: {{ $vxSettings->get('company_website', 'https://vexahostcloud.my.id') }}</p>
                 </div>
 
@@ -216,7 +216,7 @@
             <div class="mt-8 pt-4 border-t border-black text-center text-[10px] text-neutral-500 leading-relaxed">
                 <p class="font-semibold text-neutral-700">Faktur ini merupakan dokumen elektronik resmi yang diterbitkan otomatis oleh VexaHost Cloud Indonesia.</p>
                 <p>Sah dan mengikat secara hukum berdasarkan ketentuan UU ITE No. 11/2008 & PP No. 71/2019 tanpa memerlukan tanda tangan basah.</p>
-                <p class="mt-1 font-mono-code text-[9px] text-neutral-400">Dokumen ID: {{ strtoupper(hash('crc32b', $invoice->invoice_number . ($invoice->issued_at ?? $invoice->created_at))) }} &bull; https://vexahostcloud.my.id &bull; {{ config('mail.from.address', 'vexahostcloudtech@gmail.com') }}</p>
+                <p class="mt-1 font-mono-code text-[9px] text-neutral-400">Dokumen ID: {{ strtoupper(hash('crc32b', $invoice->invoice_number . ($invoice->issued_at ?? $invoice->created_at))) }} &bull; https://vexahostcloud.my.id &bull; {{ \App\Support\MailIdentity::contactEmail() }}</p>
             </div>
         </div>
     </div>

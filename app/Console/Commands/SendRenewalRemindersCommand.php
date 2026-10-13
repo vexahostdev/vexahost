@@ -217,22 +217,24 @@ class SendRenewalRemindersCommand extends Command
 
         $this->sendAdminDigestWhatsApp($digest);
 
-        $email = app(\App\Services\AdminAlertService::class)->adminEmail();
+        $emails = \App\Support\MailIdentity::adminRecipients();
 
-        if (!$email) {
+        if (empty($emails)) {
             $this->warn('Surel penerima digest admin belum diatur. Digest tidak dikirim.');
 
             return;
         }
 
-        try {
-            Notification::route('mail', $email)
-                ->notify(new AdminRenewalDigestNotification($digest));
+        foreach ($emails as $email) {
+            try {
+                Notification::route('mail', $email)
+                    ->notify(new AdminRenewalDigestNotification($digest));
 
-            $this->info("Digest admin terkirim ke {$email}.");
-        } catch (\Throwable $e) {
-            Log::error('renewal.digest_failed', ['error' => $e->getMessage()]);
-            $this->error("Digest admin gagal dikirim: {$e->getMessage()}");
+                $this->info("Digest admin terkirim ke {$email}.");
+            } catch (\Throwable $e) {
+                Log::error('renewal.digest_failed', ['recipient' => $email, 'error' => $e->getMessage()]);
+                $this->error("Digest admin gagal dikirim ke {$email}: {$e->getMessage()}");
+            }
         }
     }
 

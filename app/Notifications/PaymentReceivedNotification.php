@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Log;
 class PaymentReceivedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Order $order,
@@ -37,7 +38,7 @@ class PaymentReceivedNotification extends Notification
         $invoice = $this->invoice ?? $this->order->invoice ?? Invoice::where('order_id', $this->order->id)->first();
         $invNo = $invoice?->invoice_number ?? ('INV-' . $this->order->id);
 
-        $mail = (new MailMessage)
+        $mail = $this->newMailMessage()
             ->subject("Pembayaran diterima — {$invNo}")
             ->view('emails.payment-received', [
                 'order' => $this->order,

@@ -15,11 +15,13 @@ use Illuminate\Notifications\Notification;
 class TemplatedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public string $mailSubject,
         public string $mailBody,
-        public ?string $badgeText = null
+        public ?string $badgeText = null,
+        public string $senderType = 'noreply'
     ) {
     }
 
@@ -30,7 +32,7 @@ class TemplatedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage($this->senderType)
             ->subject($this->mailSubject)
             ->view('emails.templated', [
                 'user' => $notifiable,

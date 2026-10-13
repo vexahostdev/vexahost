@@ -15,6 +15,7 @@ use Illuminate\Notifications\Notification;
 class VpsSshUsernameChangedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public VpsInstance $instance,
@@ -51,7 +52,7 @@ class VpsSshUsernameChangedNotification extends Notification
             . "Jika Anda tidak merasa meminta perubahan ini, silakan hubungi support kami.\n\n"
             . "Terima kasih,\nTim VexaHost";
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject($subject)
             ->view('emails.templated', [
                 'user' => $notifiable,

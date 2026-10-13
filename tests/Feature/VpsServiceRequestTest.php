@@ -236,7 +236,7 @@ class VpsServiceRequestTest extends TestCase
             ->assertSessionHas('info');
 
         $this->assertSame(1, SupportTicket::count());
-        Notification::assertSentOnDemandTimes(AdminTicketNotification::class, 1);
+        Notification::assertSentOnDemandTimes(AdminTicketNotification::class, count(\App\Support\MailIdentity::adminRecipients()));
     }
 
     public function test_new_reinstall_allowed_after_previous_request_resolved(): void

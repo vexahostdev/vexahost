@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class AdminSlaBreachNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public SupportTicket $ticket
@@ -22,7 +23,7 @@ class AdminSlaBreachNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("[PERINGATAN SLA] Tiket #{$this->ticket->id} Melewati Batas Respons — {$this->ticket->subject}")
             ->view('emails.admin-sla-breach', [
                 'ticket' => $this->ticket,

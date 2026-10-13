@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 class BillingReminderNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Subscription $subscription,
@@ -47,7 +48,7 @@ class BillingReminderNotification extends Notification
             ? "Langganan {$spec} Anda jatuh tempo HARI INI ({$due})."
             : "Langganan {$spec} Anda akan jatuh tempo dalam {$this->daysUntil} hari ({$due}).";
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject($subjectText)
             ->view('emails.billing-reminder', [
                 'user' => $notifiable,

@@ -35,7 +35,7 @@ class SettingsController extends Controller
         $components = SystemComponent::orderBy('sort_order')->get();
 
         return view('admin.settings', [
-            'tab' => in_array($tab, ['brand', 'company', 'support', 'notification', 'maintenance'], true)
+            'tab' => in_array($tab, ['brand', 'company', 'support', 'notification', 'mail', 'maintenance'], true)
                 ? $tab
                 : 'brand',
             'settings' => $this->settings,
@@ -113,7 +113,6 @@ class SettingsController extends Controller
     public function updateSupport(Request $request)
     {
         $validated = $request->validate([
-            'support_email' => ['required', 'email', 'max:120'],
             'support_whatsapp' => ['nullable', 'string', 'max:30'],
             'support_hours' => ['nullable', 'string', 'max:120'],
             'social_instagram' => ['nullable', 'url', 'max:160'],
@@ -134,7 +133,6 @@ class SettingsController extends Controller
     public function updateNotification(Request $request)
     {
         $validated = $request->validate([
-            'admin_notification_email' => ['required', 'email', 'max:120'],
             'admin_notification_whatsapp' => ['nullable', 'string', 'max:200', 'regex:/^[0-9+\s,;\-]*$/'],
             'digest_enabled' => ['nullable'],
             'fulfillment_sla_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
@@ -149,7 +147,6 @@ class SettingsController extends Controller
         ]);
 
         $this->settings->setMany([
-            'admin_notification_email' => $validated['admin_notification_email'],
             'admin_notification_whatsapp' => trim((string) ($validated['admin_notification_whatsapp'] ?? '')),
             'fulfillment_sla_minutes' => $validated['fulfillment_sla_minutes'],
             'renewal_grace_days_vps' => $validated['renewal_grace_days_vps'],
@@ -182,6 +179,114 @@ class SettingsController extends Controller
         $message = "Tes notifikasi — Email: {$status($result['email'])}, WhatsApp: {$status($result['whatsapp'])}.";
 
         return back()->with($result['email'] && $result['whatsapp'] ? 'success' : 'error', $message);
+    }
+
+    /**
+     * Tab Email & Pengirim.
+     */
+    public function updateMail(Request $request)
+    {
+        $validated = $request->validate([
+            'mail_noreply_address' => ['nullable', 'email', 'max:120'],
+            'mail_noreply_name' => ['nullable', 'string', 'max:120'],
+            'mail_support_address' => ['nullable', 'email', 'max:120'],
+            'mail_support_name' => ['nullable', 'string', 'max:120'],
+            'mail_reply_to_address' => ['nullable', 'email', 'max:120'],
+            'mail_admin_addresses' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $allowedDomains = (array) config('mail.allowed_sender_domains', ['vexahostcloud.my.id']);
+        $domainListStr = implode(', ', $allowedDomains);
+
+        if (!empty($validated['mail_noreply_address'])) {
+            if (!\App\Support\MailIdentity::isDomainAllowed($validated['mail_noreply_address'], $allowedDomains)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'mail_noreply_address' => "Alamat pengirim harus memakai domain terverifikasi: {$domainListStr}",
+                ]);
+            }
+        }
+
+        if (!empty($validated['mail_support_address'])) {
+            if (!\App\Support\MailIdentity::isDomainAllowed($validated['mail_support_address'], $allowedDomains)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'mail_support_address' => "Alamat pengirim harus memakai domain terverifikasi: {$domainListStr}",
+                ]);
+            }
+        }
+
+        if (!empty($validated['mail_admin_addresses'])) {
+            $parsed = preg_split('/[\r\n,;]+/', $validated['mail_admin_addresses']) ?: [];
+            $validAdmins = [];
+            foreach ($parsed as $email) {
+                $trimmed = trim($email);
+                if ($trimmed !== '') {
+                    if (!filter_var($trimmed, FILTER_VALIDATE_EMAIL)) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'mail_admin_addresses' => "Alamat email '{$trimmed}' tidak valid.",
+                        ]);
+                    }
+                    $validAdmins[] = $trimmed;
+                }
+            }
+            if (empty($validAdmins)) {
+                throw \Illuminate\Validation\ValidationException::withMessages([
+                    'mail_admin_addresses' => 'Email admin harus memuat minimal 1 alamat email yang valid.',
+                ]);
+            }
+        }
+
+        $this->settings->setMany([
+            'mail_noreply_address' => $validated['mail_noreply_address'] ?? '',
+            'mail_noreply_name' => $validated['mail_noreply_name'] ?? '',
+            'mail_support_address' => $validated['mail_support_address'] ?? '',
+            'mail_support_name' => $validated['mail_support_name'] ?? '',
+            'mail_reply_to_address' => $validated['mail_reply_to_address'] ?? '',
+            'mail_admin_addresses' => $validated['mail_admin_addresses'] ?? '',
+        ]);
+
+        \App\Support\MailIdentity::flushCache();
+
+        $this->audit('settings.mail_updated', 'Memperbarui identitas email dan pengirim.');
+
+        return back()->with('success', 'Pengaturan email dan pengirim berhasil diperbarui.');
+    }
+
+    /**
+     * Kirim email uji identitas pengirim (noreply / support).
+     */
+    public function testMail(Request $request)
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'in:noreply,support'],
+            'to' => ['required', 'email'],
+        ]);
+
+        $type = $validated['type'];
+        $to = $validated['to'];
+
+        try {
+            $sender = $type === 'support' ? \App\Support\MailIdentity::support() : \App\Support\MailIdentity::noreply();
+            $replyTo = \App\Support\MailIdentity::replyTo();
+            $appName = config('app.name', 'VexaHost');
+
+            \Illuminate\Support\Facades\Mail::raw(
+                "Halo,\n\nIni adalah email uji coba identitas pengirim dari {$appName}.\n\nTipe: {$type}\nPengirim: {$sender['name']} <{$sender['address']}>\nReply-To: {$replyTo['name']} <{$replyTo['address']}>\n\nJika email ini sampai, konfigurasi email domain Anda sudah bekerja dengan baik.",
+                function ($message) use ($to, $sender, $replyTo, $type, $appName) {
+                    $message->to($to)
+                        ->from($sender['address'], $sender['name'])
+                        ->replyTo($replyTo['address'], $replyTo['name'])
+                        ->subject("[{$appName}] Tes Email Pengirim ({$type})");
+                }
+            );
+
+            $this->audit('settings.mail_tested', "Mengirim email tes tipe {$type} ke {$to}.");
+
+            return back()->with('success', "Email tes tipe {$type} berhasil dikirim ke {$to}.");
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('settings.mail_test_failed', ['error' => $e->getMessage()]);
+
+            return back()->with('error', 'Gagal mengirim email tes: ' . \Illuminate\Support\Str::limit($e->getMessage(), 150));
+        }
     }
 
     /**

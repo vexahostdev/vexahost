@@ -412,8 +412,8 @@ class AdminApiController extends Controller
 
         // Kirim notifikasi ke Admin
         try {
-            $adminEmail = config('mail.admin_address', 'vexahostcloudtech@gmail.com');
-            $adminUser = User::where('email', $adminEmail)->first();
+            $adminEmails = \App\Support\MailIdentity::adminRecipients();
+            $adminUser = User::whereIn('email', $adminEmails)->first() ?: User::where('is_admin', true)->first();
             if ($adminUser) {
                 $order->loadMissing(['customer', 'vpsSpec']);
                 $adminUser->notify(new \App\Notifications\AdminShopeeOrderNotification($order));

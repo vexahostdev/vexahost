@@ -115,7 +115,8 @@ class AbuseController extends Controller
             $case->user->notify(new TemplatedNotification(
                 $template->renderSubject($data),
                 $template->renderBody($data),
-                'PELANGGARAN KETENTUAN'
+                'PELANGGARAN KETENTUAN',
+                'support'
             ));
         } catch (\Throwable $e) {
             Log::error('abuse.notify_failed', [

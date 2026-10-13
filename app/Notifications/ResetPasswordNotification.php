@@ -7,6 +7,8 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class ResetPasswordNotification extends BaseResetPassword
 {
+    use \App\Notifications\Concerns\UsesMailIdentity;
+
     public function toMail($notifiable): MailMessage
     {
         $url = url(route('password.reset', [
@@ -14,7 +16,7 @@ class ResetPasswordNotification extends BaseResetPassword
             'email' => $notifiable->getEmailForPasswordReset(),
         ], false));
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject('Atur Ulang Kata Sandi Akun VexaHost')
             ->view('emails.reset-password', [
                 'user' => $notifiable,

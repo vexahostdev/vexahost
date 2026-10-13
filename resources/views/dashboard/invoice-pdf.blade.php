@@ -305,7 +305,7 @@
                 <div class="brand-name">VexaHost Cloud Infrastructure</div>
                 <div class="brand-sub">
                     Enterprise Cloud Hosting &amp; Infrastructure Services<br>
-                    Datacenter: Jakarta &amp; Singapore &bull; Portal: https://vexahostcloud.my.id &bull; Email: {{ config('mail.from.address', 'vexahostcloudtech@gmail.com') }}
+                    Datacenter: Jakarta &amp; Singapore &bull; Portal: https://vexahostcloud.my.id &bull; Email: {{ \App\Support\MailIdentity::contactEmail() }}
                 </div>
             </td>
             <td class="invoice-headline" style="width: 45%;">
@@ -343,7 +343,7 @@
                     @if($vxSettings->get('company_phone'))
                         Telepon: {{ $vxSettings->get('company_phone') }}<br>
                     @endif
-                    Email: {{ $vxSettings->get('company_email') ?: config('mail.from.address', 'vexahostcloudtech@gmail.com') }}<br>
+                    Email: {{ $vxSettings->get('company_email') ?: \App\Support\MailIdentity::contactEmail() }}<br>
                     Website Resmi: {{ $vxSettings->get('company_website', 'https://vexahostcloud.my.id') }}
                 </div>
             </td>
@@ -480,7 +480,7 @@
         Faktur ini merupakan dokumen penagihan dan bukti transaksi elektronik yang sah yang diterbitkan oleh sistem penagihan resmi VexaHost Cloud Indonesia.<br>
         Berdasarkan Undang-Undang Republik Indonesia No. 11 Tahun 2008 tentang Informasi dan Transaksi Elektronik (UU ITE) serta PP No. 71 Tahun 2019,<br>
         dokumen elektronik ini sah secara hukum dan mengikat tanpa memerlukan tanda tangan fisik atau stempel basah.<br>
-        Dukungan & Bantuan Layanan: {{ config('mail.from.address', 'vexahostcloudtech@gmail.com') }} &bull; https://vexahostcloud.my.id &bull; Dokumen ID: {{ strtoupper(hash('crc32b', $invoice->invoice_number . ($invoice->issued_at ?? $invoice->created_at))) }}
+        Dukungan & Bantuan Layanan: {{ \App\Support\MailIdentity::contactEmail() }} &bull; https://vexahostcloud.my.id &bull; Dokumen ID: {{ strtoupper(hash('crc32b', $invoice->invoice_number . ($invoice->issued_at ?? $invoice->created_at))) }}
     </div>
 </body>
 </html>

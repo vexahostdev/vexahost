@@ -15,11 +15,11 @@ class CheckTicketSlaBreachCommand extends Command
 
     public function handle(): int
     {
-        $adminEmail = config('mail.admin_address', 'vexahostcloudtech@gmail.com');
-        $adminUser = User::where('email', $adminEmail)->first();
+        $adminEmails = \App\Support\MailIdentity::adminRecipients();
+        $adminUser = User::whereIn('email', $adminEmails)->first() ?: User::where('is_admin', true)->first();
 
         if (!$adminUser) {
-            $this->warn("Admin user dengan email {$adminEmail} tidak ditemukan.");
+            $this->warn("Admin user tidak ditemukan.");
             return self::SUCCESS;
         }
 

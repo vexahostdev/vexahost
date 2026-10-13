@@ -1825,7 +1825,7 @@
                 <div class="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-xs text-xs">
                     <div>
                         <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Email Resmi</span>
-                        <p class="text-sm font-bold text-slate-900 font-mono-code mt-0.5">{{ app(\App\Services\SettingsService::class)->get('support_email', 'vexahostcloudtech@gmail.com') }}</p>
+                        <p class="text-sm font-bold text-slate-900 font-mono-code mt-0.5">{{ \App\Support\MailIdentity::contactEmail() }}</p>
                         <p class="text-slate-500 mt-0.5">Untuk pertanyaan umum, pengajuan tiket &amp; kerjasama</p>
                     </div>
 

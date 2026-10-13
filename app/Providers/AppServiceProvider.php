@@ -108,6 +108,14 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
+        // Listener MessageSending: pengaman untuk memastikan Reply-To selalu terisi
+        Event::listen(\Illuminate\Mail\Events\MessageSending::class, function (\Illuminate\Mail\Events\MessageSending $event) {
+            if (empty($event->message->getReplyTo())) {
+                $replyTo = \App\Support\MailIdentity::replyTo();
+                $event->message->replyTo(new \Symfony\Component\Mime\Address($replyTo['address'], $replyTo['name']));
+            }
+        });
+
         // Branding dibagikan ke SELURUH view agar nama merek, logo, dan warna
         // tidak lagi ditulis langsung di blade. Diambil dari tabel settings (Phase 1).
         // View::share dieksekusi sekali per request (bukan per @include/@component).
@@ -123,7 +131,7 @@ class AppServiceProvider extends ServiceProvider
                     ? asset('storage/' . $settings->get('brand_favicon_path'))
                     : asset('images/logo.png'),
                 'accent' => $settings->get('brand_accent_color', '#4A6FA5'),
-                'support_email' => $settings->get('support_email', 'vexahostcloudtech@gmail.com'),
+                'support_email' => \App\Support\MailIdentity::contactEmail(),
                 'support_whatsapp' => $settings->get('support_whatsapp', ''),
             ]);
         } catch (\Throwable) {
@@ -133,7 +141,7 @@ class AppServiceProvider extends ServiceProvider
                 'logo' => asset('images/logo.png'),
                 'favicon' => asset('images/logo.png'),
                 'accent' => '#4A6FA5',
-                'support_email' => 'vexahostcloudtech@gmail.com',
+                'support_email' => \App\Support\MailIdentity::contactEmail(),
                 'support_whatsapp' => '',
             ]);
         }

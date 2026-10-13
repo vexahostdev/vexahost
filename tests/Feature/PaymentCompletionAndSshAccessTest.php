@@ -169,7 +169,11 @@ class PaymentCompletionAndSshAccessTest extends TestCase
 
     private function adminMailCount(string $class): int
     {
-        return Notification::sent(new AnonymousNotifiable, $class)->count();
+        return Notification::sent(
+            new AnonymousNotifiable,
+            $class,
+            fn ($n, $channels, $notifiable) => ($notifiable->routes['mail'] ?? null) === self::ADMIN_EMAIL
+        )->count();
     }
 
     // ===================== 1. Titik pusat "setelah lunas" =====================
@@ -347,7 +351,11 @@ class PaymentCompletionAndSshAccessTest extends TestCase
     {
         app(SettingsService::class)->setMany(['admin_notification_whatsapp' => '']);
         config(['vexahost.admin_email' => '']);
+        config(['mail.admin_address' => '']);
+        config(['mail.admin_addresses' => []]);
         app(SettingsService::class)->set('admin_notification_email', '');
+        app(SettingsService::class)->set('mail_admin_addresses', '');
+        \App\Support\MailIdentity::flushCache();
 
         $customer = $this->customer();
         $order = Order::create(['customer_id' => $customer->id, 'organization_id' => $customer->current_organization_id,

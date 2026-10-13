@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Log;
 class InvoiceCreatedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Invoice $invoice
@@ -32,7 +33,7 @@ class InvoiceCreatedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $mail = (new MailMessage)
+        $mail = $this->newMailMessage()
             ->subject("Tagihan Baru Diterbitkan — {$this->invoice->invoice_number}")
             ->view('emails.invoice-created', [
                 'invoice' => $this->invoice,

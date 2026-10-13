@@ -20,6 +20,7 @@ use Illuminate\Notifications\Notification;
 class InstanceRenewalReminderNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public VpsInstance $instance,
@@ -48,7 +49,7 @@ class InstanceRenewalReminderNotification extends Notification
 
         [$subject, $badge, $heading, $body] = $this->content($name, $due, $graceEnd);
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject($subject)
             ->view('emails.renewal-reminder', [
                 'user' => $notifiable,

@@ -7,9 +7,11 @@ use Illuminate\Notifications\Messages\MailMessage;
 
 class VerifyEmailNotification extends BaseVerifyEmail
 {
+    use \App\Notifications\Concerns\UsesMailIdentity;
+
     protected function buildMailMessage($url): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject('Verifikasi email VexaHost')
             ->greeting('Halo,')
             ->line('Klik tombol di bawah untuk mengonfirmasi alamat email Anda.')

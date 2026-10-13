@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 class ServiceSuspendedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Subscription $subscription
@@ -32,7 +33,7 @@ class ServiceSuspendedNotification extends Notification
     {
         $spec = $this->subscription->vpsSpec?->name ?? 'VPS';
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("Layanan ditangguhkan (overdue) — {$spec}")
             ->view('emails.service-suspended', [
                 'user' => $notifiable,

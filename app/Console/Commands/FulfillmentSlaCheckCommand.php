@@ -53,28 +53,33 @@ class FulfillmentSlaCheckCommand extends Command
             return self::SUCCESS;
         }
 
-        $email = $settings->get('admin_notification_email');
+        $emails = \App\Support\MailIdentity::adminRecipients();
 
-        if (!$email) {
+        if (empty($emails)) {
             $this->warn('Surel penerima admin belum diatur. Peringatan tidak dikirim.');
 
             return self::SUCCESS;
         }
 
-        try {
-            Notification::route('mail', $email)
-                ->notify(new AdminFulfillmentOverdueNotification($orders, $fulfillment->slaMinutes()));
-        } catch (\Throwable $e) {
-            Log::error('fulfillment.sla_alert_failed', ['error' => $e->getMessage()]);
-            $this->error('Peringatan gagal dikirim: ' . $e->getMessage());
+        $sentAny = false;
+        foreach ($emails as $email) {
+            try {
+                Notification::route('mail', $email)
+                    ->notify(new AdminFulfillmentOverdueNotification($orders, $fulfillment->slaMinutes()));
+                $this->info("Peringatan terkirim ke {$email}.");
+                $sentAny = true;
+            } catch (\Throwable $e) {
+                Log::error('fulfillment.sla_alert_failed', ['recipient' => $email, 'error' => $e->getMessage()]);
+                $this->error("Peringatan gagal dikirim ke {$email}: " . $e->getMessage());
+            }
+        }
 
+        if (!$sentAny) {
             // sla_alerted_at tidak diisi agar dicoba lagi pada jam berikutnya.
             return self::FAILURE;
         }
 
         Order::whereIn('id', $orders->pluck('id'))->update(['sla_alerted_at' => now()]);
-
-        $this->info("Peringatan terkirim ke {$email}.");
 
         return self::SUCCESS;
     }

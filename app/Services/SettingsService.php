@@ -131,6 +131,7 @@ class SettingsService
     {
         $this->memo = null;
         Cache::forget(self::CACHE_KEY);
+        Cache::forget(\App\Support\MailIdentity::CACHE_KEY);
     }
 
     /**

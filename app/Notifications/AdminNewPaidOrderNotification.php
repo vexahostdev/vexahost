@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class AdminNewPaidOrderNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Order $order
@@ -27,7 +28,7 @@ class AdminNewPaidOrderNotification extends Notification
 
         $label = $this->order->isRenewal() ? 'PERPANJANGAN LUNAS' : 'ORDER LUNAS — PERLU SETUP';
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("💰 [{$label}] Order #{$this->order->id} — {$spec} ({$amount})")
             ->view('emails.admin-new-order', [
                 'order' => $this->order,

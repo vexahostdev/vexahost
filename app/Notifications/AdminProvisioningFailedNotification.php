@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class AdminProvisioningFailedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public ProvisioningTask $task,
@@ -23,7 +24,7 @@ class AdminProvisioningFailedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("🚨 [PROVISIONING GAGAL] Order #{$this->task->order_id} — Butuh Intervensi Manual")
             ->view('emails.admin-provisioning-failed', [
                 'task' => $this->task,

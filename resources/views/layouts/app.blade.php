@@ -111,7 +111,7 @@
                         '@type' => 'ContactPoint',
                         'telephone' => '+'.\App\Support\NomorWhatsApp::internasional(),
                         'contactType' => 'customer service',
-                        'email' => 'vexahostcloudtech@gmail.com',
+                        'email' => \App\Support\MailIdentity::contactEmail(),
                         'areaServed' => 'ID',
                         'availableLanguage' => ['Indonesian', 'English'],
                     ],

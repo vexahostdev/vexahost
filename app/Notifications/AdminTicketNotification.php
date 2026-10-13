@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class AdminTicketNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public SupportTicket $ticket,
@@ -26,7 +27,7 @@ class AdminTicketNotification extends Notification
     {
         $title = $this->eventType === 'created' ? 'Tiket Bantuan Baru Masuk' : 'Balasan Baru dari Pelanggan';
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("[SUPPORT] {$title} — #{$this->ticket->id}")
             ->view('emails.admin-ticket', [
                 'ticket' => $this->ticket,

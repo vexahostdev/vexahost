@@ -312,7 +312,7 @@ class FulfillmentWorkboardTest extends TestCase
         $this->artisan('fulfillment:check-sla')->assertExitCode(0);
         $this->artisan('fulfillment:check-sla')->assertExitCode(0);
 
-        Notification::assertSentOnDemandTimes(AdminFulfillmentOverdueNotification::class, 1);
+        Notification::assertSentOnDemandTimes(AdminFulfillmentOverdueNotification::class, count(\App\Support\MailIdentity::adminRecipients()));
         $this->assertNotNull($a->fresh()->sla_alerted_at);
         $this->assertNotNull($b->fresh()->sla_alerted_at);
     }

@@ -13,6 +13,7 @@ use Illuminate\Notifications\Notification;
 class PaymentRejectedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Order $order,
@@ -35,7 +36,7 @@ class PaymentRejectedNotification extends Notification
     {
         $invNo = $this->invoice?->invoice_number ?? ('INV-' . $this->order->id);
 
-        return (new MailMessage)
+        return $this->newMailMessage('support')
             ->subject("Pembayaran Tidak Terverifikasi — {$invNo}")
             ->view('emails.payment-rejected', [
                 'order' => $this->order,

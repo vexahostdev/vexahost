@@ -14,6 +14,7 @@ use Illuminate\Support\Collection;
 class AdminFulfillmentOverdueNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Collection $orders,
@@ -41,7 +42,7 @@ class AdminFulfillmentOverdueNotification extends Notification
             ),
         ])->all();
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject($subject)
             ->view('emails.admin-fulfillment-overdue', [
                 'subject' => $subject,

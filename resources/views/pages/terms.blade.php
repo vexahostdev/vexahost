@@ -146,7 +146,7 @@
                             Laporan pelanggaran siber, abuse, atau sengketa hak cipta dapat diajukan ke:
                         </p>
                         <div class="space-y-1 font-mono-code text-[11px]">
-                            <p class="text-slate-800 bg-slate-50 p-1.5 rounded border border-slate-100">vexahostcloudtech@gmail.com</p>
+                            <p class="text-slate-800 bg-slate-50 p-1.5 rounded border border-slate-100">{{ \App\Support\MailIdentity::contactEmail() }}</p>
                         </div>
                     </div>
                 </div>

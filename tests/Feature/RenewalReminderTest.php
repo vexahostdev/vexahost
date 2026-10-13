@@ -270,7 +270,7 @@ class RenewalReminderTest extends TestCase
 
         $this->artisan('renewal:remind');
 
-        Notification::assertSentOnDemandTimes(AdminRenewalDigestNotification::class, 1);
+        Notification::assertSentOnDemandTimes(AdminRenewalDigestNotification::class, count(\App\Support\MailIdentity::adminRecipients()));
     }
 
     public function test_digest_is_skipped_when_disabled(): void

@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 class VpsProvisionedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public VpsInstance $instance
@@ -33,7 +34,7 @@ class VpsProvisionedNotification extends Notification
         $hostname = $this->instance->hostname;
         $ip = $this->instance->public_ip ?? 'Aktif';
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("🚀 Server VPS Anda Telah Aktif — {$hostname} ({$ip})")
             ->view('emails.vps-provisioned', [
                 'user' => $notifiable,

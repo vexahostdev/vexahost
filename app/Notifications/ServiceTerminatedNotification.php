@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 class ServiceTerminatedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public Subscription $subscription
@@ -32,7 +33,7 @@ class ServiceTerminatedNotification extends Notification
     {
         $spec = $this->subscription->vpsSpec?->name ?? 'VPS';
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("Layanan dihapus permanen — {$spec}")
             ->view('emails.service-terminated', [
                 'user' => $notifiable,

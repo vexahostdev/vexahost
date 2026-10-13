@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\Notification;
 /**
  * Notifikasi internal untuk admin VexaHost: WhatsApp + email.
  *
- * Penerima diambil dari SATU sumber, Admin > Pengaturan > Notifikasi:
- *  - admin_notification_email    (cadangan: config vexahost.admin_email)
+ * Penerima email diambil dari MailIdentity::adminRecipients() (dikelola
+ * lewat Admin > Pengaturan > Email & Pengirim).
+ * Penerima WhatsApp diambil dari Admin > Pengaturan > Notifikasi:
  *  - admin_notification_whatsapp (boleh beberapa nomor, dipisah koma/baris baru)
  *
  * Kegagalan satu kanal tidak menghentikan kanal lain dan tidak pernah
@@ -25,15 +26,16 @@ class AdminAlertService
     {
     }
 
+    public function adminEmails(): array
+    {
+        return \App\Support\MailIdentity::adminRecipients();
+    }
+
     public function adminEmail(): ?string
     {
-        $email = trim((string) $this->settings->get('admin_notification_email', ''));
+        $emails = $this->adminEmails();
 
-        if ($email === '') {
-            $email = trim((string) config('vexahost.admin_email', ''));
-        }
-
-        return filter_var($email, FILTER_VALIDATE_EMAIL) ? $email : null;
+        return $emails[0] ?? null;
     }
 
     /**
@@ -124,9 +126,15 @@ class AdminAlertService
      */
     public function digest(string $subject, string $text): bool
     {
+        $noreply = \App\Support\MailIdentity::noreply();
+        $replyTo = \App\Support\MailIdentity::replyTo();
+
         $mailOk = $this->sendMail(fn (string $email) => \Illuminate\Support\Facades\Mail::raw(
             str_replace(['*', '_'], '', $text),
-            fn ($message) => $message->to($email)->subject($subject)
+            fn ($message) => $message->to($email)
+                ->from($noreply['address'], $noreply['name'])
+                ->replyTo($replyTo['address'], $replyTo['name'])
+                ->subject($subject)
         ), 'digest');
 
         $waOk = $this->sendWhatsApp($text, 'digest');
@@ -141,9 +149,15 @@ class AdminAlertService
      */
     public function test(): array
     {
+        $noreply = \App\Support\MailIdentity::noreply();
+        $replyTo = \App\Support\MailIdentity::replyTo();
+
         $email = $this->sendMail(fn (string $email) => \Illuminate\Support\Facades\Mail::raw(
             "Halo Admin,\n\nIni pesan uji. Jika surel ini masuk, notifikasi order lunas & pengingat setup akan sampai ke alamat ini.\n\nTim VexaHost",
-            fn ($message) => $message->to($email)->subject('Tes Notifikasi Admin VexaHost')
+            fn ($message) => $message->to($email)
+                ->from($noreply['address'], $noreply['name'])
+                ->replyTo($replyTo['address'], $replyTo['name'])
+                ->subject('Tes Notifikasi Admin VexaHost')
         ), 'test');
 
         $wa = $this->sendWhatsApp(
@@ -232,23 +246,31 @@ class AdminAlertService
 
     private function sendMail(callable $send, string $context, ?int $orderId = null): bool
     {
-        $email = $this->adminEmail();
+        $emails = $this->adminEmails();
 
-        if (!$email) {
+        if (empty($emails)) {
             Log::warning('admin_alert.email_missing', ['context' => $context, 'order_id' => $orderId]);
 
             return false;
         }
 
-        try {
-            $send($email);
+        $anySuccess = false;
 
-            return true;
-        } catch (\Throwable $e) {
-            Log::error('admin_alert.email_failed', ['context' => $context, 'order_id' => $orderId, 'error' => $e->getMessage()]);
-
-            return false;
+        foreach ($emails as $email) {
+            try {
+                $send($email);
+                $anySuccess = true;
+            } catch (\Throwable $e) {
+                Log::error('admin_alert.email_failed', [
+                    'context' => $context,
+                    'order_id' => $orderId,
+                    'recipient' => $email,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         }
+
+        return $anySuccess;
     }
 
     private function sendWhatsApp(string $message, string $context, ?int $orderId = null): bool

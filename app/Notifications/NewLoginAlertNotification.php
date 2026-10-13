@@ -10,6 +10,7 @@ use Illuminate\Notifications\Notification;
 class NewLoginAlertNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(public LoginActivity $activity) {}
 
@@ -20,7 +21,7 @@ class NewLoginAlertNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject('Peringatan Keamanan: Login Baru Terdeteksi')
             ->view('emails.new-login-alert', [
                 'user' => $notifiable,

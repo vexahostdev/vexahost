@@ -144,7 +144,7 @@
                             Permohonan hak akses, koreksi, atau penghapusan data akun (Right to Erasure) ditujukan ke:
                         </p>
                         <div class="space-y-1 font-mono-code text-[11px]">
-                            <p class="text-slate-800 bg-slate-50 p-1.5 rounded border border-slate-100">vexahostcloudtech@gmail.com</p>
+                            <p class="text-slate-800 bg-slate-50 p-1.5 rounded border border-slate-100">{{ \App\Support\MailIdentity::contactEmail() }}</p>
                         </div>
                     </div>
                 </div>
@@ -440,7 +440,7 @@
                         <div class="p-4 rounded-lg bg-slate-50 border border-slate-200 text-xs space-y-1">
                             <p><strong class="text-slate-900">Data Protection Officer — VexaHost</strong></p>
                             <p class="text-slate-600">VexaHost Cloud Indonesia</p>
-                            <p class="text-slate-600">Alamat Surat Elektronik: <code class="font-mono-code bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-900">vexahostcloudtech@gmail.com</code></p>
+                            <p class="text-slate-600">Alamat Surat Elektronik: <code class="font-mono-code bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-900">{{ \App\Support\MailIdentity::contactEmail() }}</code></p>
                             <p class="text-slate-600">Waktu Respons: Maksimal 3 (tiga) hari kerja operasional</p>
                         </div>
                     </div>

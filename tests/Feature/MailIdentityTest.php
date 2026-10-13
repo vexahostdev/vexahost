@@ -261,4 +261,73 @@ class MailIdentityTest extends TestCase
         // Pembacaan ulang menghasilkan nilai baru
         $this->assertSame('update@vexahostcloud.my.id', MailIdentity::noreply()['address']);
     }
+
+    public function test_admin_recipients_override_replaces_all_config_addresses(): void
+    {
+        $settings = app(SettingsService::class);
+        $settings->set('mail_admin_addresses', 'singleadmin@vexahostcloud.my.id');
+        MailIdentity::flushCache();
+
+        $recipients = MailIdentity::adminRecipients();
+        $this->assertSame(['singleadmin@vexahostcloud.my.id'], $recipients);
+    }
+
+    public function test_migration_data_migrates_legacy_settings_idempotently(): void
+    {
+        $settings = app(SettingsService::class);
+        $settings->set('admin_notification_email', 'legacy-admin@contoh.id');
+        $settings->set('mail_admin_addresses', '');
+        $settings->set('support_email', 'support@vexahostcloud.my.id');
+        $settings->set('mail_support_address', '');
+
+        $migration = require database_path('migrations/2026_10_13_110000_migrate_legacy_email_settings_to_mail_identity.php');
+        $migration->up();
+
+        $adminAddresses = $settings->get('mail_admin_addresses');
+        $this->assertStringContainsString('legacy-admin@contoh.id', $adminAddresses);
+        $this->assertStringContainsString('support@vexahostcloud.my.id', $adminAddresses);
+        $this->assertSame('support@vexahostcloud.my.id', $settings->get('mail_support_address'));
+        // Legacy keys must still exist
+        $this->assertSame('legacy-admin@contoh.id', $settings->get('admin_notification_email'));
+        $this->assertSame('support@vexahostcloud.my.id', $settings->get('support_email'));
+    }
+
+    public function test_migration_data_ignores_unverified_support_domain(): void
+    {
+        $settings = app(SettingsService::class);
+        $settings->set('support_email', 'vexahostcloudtech@gmail.com');
+        $settings->set('mail_support_address', '');
+
+        $migration = require database_path('migrations/2026_10_13_110000_migrate_legacy_email_settings_to_mail_identity.php');
+        $migration->up();
+
+        // mail_support_address should remain empty because gmail.com is not verified
+        $this->assertEmpty($settings->get('mail_support_address'));
+    }
+
+    public function test_support_and_notification_forms_succeed_without_legacy_fields(): void
+    {
+        $admin = $this->admin;
+
+        // Support form without support_email
+        $response = $this->actingAs($admin)->post(route('admin.settings.support'), [
+            'support_whatsapp' => '+6281234567890',
+            'support_hours' => '24/7 Mon-Sun',
+            'social_instagram' => 'https://instagram.com/vexahost',
+        ]);
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+
+        // Notification form without admin_notification_email
+        $response = $this->actingAs($admin)->post(route('admin.settings.notification'), [
+            'admin_notification_whatsapp' => '6281234567890',
+            'fulfillment_sla_minutes' => 60,
+            'renewal_grace_days_vps' => 3,
+            'renewal_grace_days_database' => 14,
+            'renewal_grace_days_app' => 14,
+        ]);
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+    }
 }
+

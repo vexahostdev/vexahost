@@ -244,9 +244,10 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="{{ $labelClass }}">Surel Dukungan</label>
-                        <input type="email" name="support_email" required maxlength="120"
-                               value="{{ old('support_email', $settings->get('support_email', '')) }}"
-                               class="{{ $inputClass }}">
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                            <p>Surel kontak dukungan kini dikelola terpusat di tab <button type="button" @click="tab = 'mail'" class="font-semibold text-black underline hover:text-neutral-700">Email &amp; Pengirim</button>.</p>
+                            <p class="text-[11px] text-slate-500">Nilai aktif: <span class="font-mono-code font-semibold text-slate-800">{{ \App\Support\MailIdentity::contactEmail() }}</span></p>
+                        </div>
                     </div>
                     <div>
                         <label class="{{ $labelClass }}">Nomor WhatsApp</label>
@@ -307,11 +308,11 @@
             <div class="p-5 space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="{{ $labelClass }}">Surel Penerima Digest Admin</label>
-                        <input type="email" name="admin_notification_email" required maxlength="120"
-                               value="{{ old('admin_notification_email', $settings->get('admin_notification_email', '')) }}"
-                               class="{{ $inputClass }}">
-                        <p class="text-[11px] text-slate-500 mt-1">Satu surel berisi seluruh layanan jatuh tempo, bukan satu surel per layanan.</p>
+                        <label class="{{ $labelClass }}">Surel Penerima Notifikasi Admin</label>
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                            <p>Penerima notifikasi email admin dikelola terpusat di tab <button type="button" @click="tab = 'mail'" class="font-semibold text-black underline hover:text-neutral-700">Email &amp; Pengirim</button>.</p>
+                            <p class="text-[11px] text-slate-500">Nilai aktif: <span class="font-mono-code font-semibold text-slate-800">{{ implode(', ', \App\Support\MailIdentity::adminRecipients()) }}</span></p>
+                        </div>
                     </div>
                     <div>
                         <label class="{{ $labelClass }}">Ambang Waktu Tanggap Pemenuhan (menit)</label>

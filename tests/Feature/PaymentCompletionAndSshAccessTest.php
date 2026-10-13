@@ -52,9 +52,11 @@ class PaymentCompletionAndSshAccessTest extends TestCase
         ]);
 
         app(SettingsService::class)->setMany([
+            'mail_admin_addresses' => self::ADMIN_EMAIL,
             'admin_notification_email' => self::ADMIN_EMAIL,
             'admin_notification_whatsapp' => '0811-1111-1111',
         ]);
+        \App\Support\MailIdentity::flushCache();
 
         Http::fake([
             'https://api.xendit.co/*' => Http::response(['status' => 'PAID'], 200),
@@ -350,12 +352,9 @@ class PaymentCompletionAndSshAccessTest extends TestCase
     public function test_reminder_is_retried_when_no_channel_succeeds(): void
     {
         app(SettingsService::class)->setMany(['admin_notification_whatsapp' => '']);
-        config(['vexahost.admin_email' => '']);
-        config(['mail.admin_address' => '']);
-        config(['mail.admin_addresses' => []]);
-        app(SettingsService::class)->set('admin_notification_email', '');
-        app(SettingsService::class)->set('mail_admin_addresses', '');
-        \App\Support\MailIdentity::flushCache();
+        $mockAlerts = \Mockery::mock(\App\Services\AdminAlertService::class);
+        $mockAlerts->shouldReceive('fulfillmentReminder')->andReturn(false);
+        $this->app->instance(\App\Services\AdminAlertService::class, $mockAlerts);
 
         $customer = $this->customer();
         $order = Order::create(['customer_id' => $customer->id, 'organization_id' => $customer->current_organization_id,

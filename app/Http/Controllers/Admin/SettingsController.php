@@ -113,7 +113,6 @@ class SettingsController extends Controller
     public function updateSupport(Request $request)
     {
         $validated = $request->validate([
-            'support_email' => ['required', 'email', 'max:120'],
             'support_whatsapp' => ['nullable', 'string', 'max:30'],
             'support_hours' => ['nullable', 'string', 'max:120'],
             'social_instagram' => ['nullable', 'url', 'max:160'],
@@ -134,7 +133,6 @@ class SettingsController extends Controller
     public function updateNotification(Request $request)
     {
         $validated = $request->validate([
-            'admin_notification_email' => ['required', 'email', 'max:120'],
             'admin_notification_whatsapp' => ['nullable', 'string', 'max:200', 'regex:/^[0-9+\s,;\-]*$/'],
             'digest_enabled' => ['nullable'],
             'fulfillment_sla_minutes' => ['required', 'integer', 'min:5', 'max:1440'],
@@ -149,7 +147,6 @@ class SettingsController extends Controller
         ]);
 
         $this->settings->setMany([
-            'admin_notification_email' => $validated['admin_notification_email'],
             'admin_notification_whatsapp' => trim((string) ($validated['admin_notification_whatsapp'] ?? '')),
             'fulfillment_sla_minutes' => $validated['fulfillment_sla_minutes'],
             'renewal_grace_days_vps' => $validated['renewal_grace_days_vps'],

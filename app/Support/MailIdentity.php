@@ -125,18 +125,6 @@ class MailIdentity
         $configReplyToAddress = config('mail.reply_to.address') ?: $configSupportAddress;
         $configReplyToName = config('mail.reply_to.name') ?: $configSupportName;
 
-        // Kumpulkan penerima admin dari konfigurasi lama & baru
-        $configAdmins = [];
-        if (!empty(config('mail.admin_addresses'))) {
-            $configAdmins = (array) config('mail.admin_addresses');
-        }
-        if ($oldMailAdmin = config('mail.admin_address')) {
-            $configAdmins[] = $oldMailAdmin;
-        }
-        if ($oldVexaAdmin = config('vexahost.admin_email')) {
-            $configAdmins[] = $oldVexaAdmin;
-        }
-
         $dbNoreplyAddress = null;
         $dbNoreplyName = null;
         $dbSupportAddress = null;
@@ -156,12 +144,6 @@ class MailIdentity
                 $rawAdmins = (string) $settings->get('mail_admin_addresses', '');
                 if ($rawAdmins !== '') {
                     $dbAdminAddresses = preg_split('/[\r\n,;]+/', $rawAdmins) ?: [];
-                }
-
-                // Sertakan juga nilai admin_notification_email lama jika ada di tabel settings
-                $legacyAdmin = trim((string) $settings->get('admin_notification_email', ''));
-                if ($legacyAdmin !== '') {
-                    $dbAdminAddresses[] = $legacyAdmin;
                 }
             }
         } catch (\Throwable $e) {
@@ -216,19 +198,41 @@ class MailIdentity
         }
         $resolvedReplyToName = $resolvedSupportName;
 
-        // Resolusi Admin Recipients
-        $mergedAdmins = array_merge($dbAdminAddresses, $configAdmins);
-        $cleanAdmins = [];
-        foreach ($mergedAdmins as $item) {
+        // Resolusi Admin Recipients:
+        // 1. Jika DB tidak kosong setelah dibersihkan, gunakan HANYA DB.
+        // 2. Jika kosong, gunakan HANYA config('mail.admin_addresses').
+        // 3. Jika itu juga kosong, gunakan fallback hardcode [support@, gmail].
+        $cleanDbAdmins = [];
+        foreach ($dbAdminAddresses as $item) {
             $email = trim((string) $item);
             if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                $cleanAdmins[] = strtolower($email);
+                $cleanDbAdmins[] = strtolower($email);
             }
         }
-        $cleanAdmins = array_values(array_unique($cleanAdmins));
+        $cleanDbAdmins = array_values(array_unique($cleanDbAdmins));
 
-        if (empty($cleanAdmins) && config('mail.admin_addresses') === null) {
-            $cleanAdmins = ['support@vexahostcloud.my.id', 'vexahostcloudtech@gmail.com'];
+        if (!empty($cleanDbAdmins)) {
+            $cleanAdmins = $cleanDbAdmins;
+            $sources['admin'] = 'database';
+        } else {
+            $configAdmins = [];
+            if (!empty(config('mail.admin_addresses'))) {
+                foreach ((array) config('mail.admin_addresses') as $item) {
+                    $email = trim((string) $item);
+                    if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $configAdmins[] = strtolower($email);
+                    }
+                }
+                $configAdmins = array_values(array_unique($configAdmins));
+            }
+
+            if (!empty($configAdmins)) {
+                $cleanAdmins = $configAdmins;
+                $sources['admin'] = 'config';
+            } else {
+                $cleanAdmins = ['support@vexahostcloud.my.id', 'vexahostcloudtech@gmail.com'];
+                $sources['admin'] = 'hardcode';
+            }
         }
 
         return [

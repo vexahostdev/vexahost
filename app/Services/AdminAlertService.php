@@ -12,8 +12,9 @@ use Illuminate\Support\Facades\Notification;
 /**
  * Notifikasi internal untuk admin VexaHost: WhatsApp + email.
  *
- * Penerima diambil dari SATU sumber, Admin > Pengaturan > Notifikasi:
- *  - admin_notification_email    (cadangan: config vexahost.admin_email)
+ * Penerima email diambil dari MailIdentity::adminRecipients() (dikelola
+ * lewat Admin > Pengaturan > Email & Pengirim).
+ * Penerima WhatsApp diambil dari Admin > Pengaturan > Notifikasi:
  *  - admin_notification_whatsapp (boleh beberapa nomor, dipisah koma/baris baru)
  *
  * Kegagalan satu kanal tidak menghentikan kanal lain dan tidak pernah

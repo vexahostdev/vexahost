@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 class WelcomeCredentialsNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public ?string $plainPassword = null
@@ -30,7 +31,7 @@ class WelcomeCredentialsNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject("Selamat Datang di VexaHost Cloud — Informasi Akses Akun")
             ->view('emails.welcome-credentials', [
                 'user' => $notifiable,

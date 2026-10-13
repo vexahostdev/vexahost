@@ -52,6 +52,9 @@
         <button type="button" @click="tab = 'notification'"
                 :class="tab === 'notification' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'"
                 class="{{ $tabBase }}">Notifikasi & Tenggang</button>
+        <button type="button" @click="tab = 'mail'"
+                :class="tab === 'mail' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'"
+                class="{{ $tabBase }}">Email & Pengirim</button>
         <button type="button" @click="tab = 'maintenance'"
                 :class="tab === 'maintenance' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:bg-slate-50'"
                 class="{{ $tabBase }}">Maintenance</button>
@@ -241,9 +244,10 @@
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="{{ $labelClass }}">Surel Dukungan</label>
-                        <input type="email" name="support_email" required maxlength="120"
-                               value="{{ old('support_email', $settings->get('support_email', '')) }}"
-                               class="{{ $inputClass }}">
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                            <p>Surel kontak dukungan kini dikelola terpusat di tab <button type="button" @click="tab = 'mail'" class="font-semibold text-black underline hover:text-neutral-700">Email &amp; Pengirim</button>.</p>
+                            <p class="text-[11px] text-slate-500">Nilai aktif: <span class="font-mono-code font-semibold text-slate-800">{{ \App\Support\MailIdentity::contactEmail() }}</span></p>
+                        </div>
                     </div>
                     <div>
                         <label class="{{ $labelClass }}">Nomor WhatsApp</label>
@@ -304,11 +308,11 @@
             <div class="p-5 space-y-4">
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                        <label class="{{ $labelClass }}">Surel Penerima Digest Admin</label>
-                        <input type="email" name="admin_notification_email" required maxlength="120"
-                               value="{{ old('admin_notification_email', $settings->get('admin_notification_email', '')) }}"
-                               class="{{ $inputClass }}">
-                        <p class="text-[11px] text-slate-500 mt-1">Satu surel berisi seluruh layanan jatuh tempo, bukan satu surel per layanan.</p>
+                        <label class="{{ $labelClass }}">Surel Penerima Notifikasi Admin</label>
+                        <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-600 space-y-1">
+                            <p>Penerima notifikasi email admin dikelola terpusat di tab <button type="button" @click="tab = 'mail'" class="font-semibold text-black underline hover:text-neutral-700">Email &amp; Pengirim</button>.</p>
+                            <p class="text-[11px] text-slate-500">Nilai aktif: <span class="font-mono-code font-semibold text-slate-800">{{ implode(', ', \App\Support\MailIdentity::adminRecipients()) }}</span></p>
+                        </div>
                     </div>
                     <div>
                         <label class="{{ $labelClass }}">Ambang Waktu Tanggap Pemenuhan (menit)</label>
@@ -395,6 +399,120 @@
             <button type="submit"
                     class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold transition-colors">
                 Kirim Tes
+            </button>
+        </form>
+    </div>
+
+    <!-- ============ TAB: EMAIL & PENGIRIM ============ -->
+    <div x-show="tab === 'mail'" x-cloak class="space-y-6">
+        <form action="{{ route('admin.settings.mail') }}" method="POST"
+              class="bg-white rounded-lg border border-slate-200 overflow-hidden">
+            @csrf
+            <div class="px-5 py-4 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-base">Identitas Email &amp; Pengirim</h3>
+                <p class="text-xs text-slate-500">
+                    Konfigurasi alamat pengirim (noreply &amp; support), Reply-To, dan penerima notifikasi admin.
+                </p>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <p class="text-[11px] text-blue-900 leading-relaxed">
+                        Domain terverifikasi pengirim: <strong>{{ implode(', ', (array) config('mail.allowed_sender_domains', ['vexahostcloud.my.id'])) }}</strong>.<br>
+                        Field yang dibiarkan kosong akan otomatis menggunakan nilai default dari konfigurasi lingkungan (<code>.env</code>).
+                    </p>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="{{ $labelClass }}">Nama Pengirim Noreply</label>
+                        <input type="text" name="mail_noreply_name" maxlength="120"
+                               placeholder="{{ config('mail.from.name', 'VexaHost Cloud') }}"
+                               value="{{ old('mail_noreply_name', $settings->get('mail_noreply_name', '')) }}"
+                               class="{{ $inputClass }}">
+                        <p class="text-[11px] text-slate-500 mt-1">Dipakai untuk email otomatis (tagihan, peringatan, sistem).</p>
+                    </div>
+                    <div>
+                        <label class="{{ $labelClass }}">Alamat Pengirim Noreply</label>
+                        <input type="email" name="mail_noreply_address" maxlength="120"
+                               placeholder="{{ config('mail.from.address', 'noreply@vexahostcloud.my.id') }}"
+                               value="{{ old('mail_noreply_address', $settings->get('mail_noreply_address', '')) }}"
+                               class="{{ $inputClass }} font-mono-code">
+                        <p class="text-[11px] text-slate-500 mt-1">Wajib menggunakan domain terverifikasi.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="{{ $labelClass }}">Nama Pengirim Support</label>
+                        <input type="text" name="mail_support_name" maxlength="120"
+                               placeholder="{{ config('mail.support.name', 'VexaHost Support') }}"
+                               value="{{ old('mail_support_name', $settings->get('mail_support_name', '')) }}"
+                               class="{{ $inputClass }}">
+                        <p class="text-[11px] text-slate-500 mt-1">Dipakai untuk tiket bantuan dan penolakan bayar.</p>
+                    </div>
+                    <div>
+                        <label class="{{ $labelClass }}">Alamat Pengirim Support</label>
+                        <input type="email" name="mail_support_address" maxlength="120"
+                               placeholder="{{ config('mail.support.address', 'support@vexahostcloud.my.id') }}"
+                               value="{{ old('mail_support_address', $settings->get('mail_support_address', '')) }}"
+                               class="{{ $inputClass }} font-mono-code">
+                        <p class="text-[11px] text-slate-500 mt-1">Wajib menggunakan domain terverifikasi.</p>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="{{ $labelClass }}">Alamat Reply-To</label>
+                    <input type="email" name="mail_reply_to_address" maxlength="120"
+                           placeholder="{{ config('mail.reply_to.address', 'support@vexahostcloud.my.id') }}"
+                           value="{{ old('mail_reply_to_address', $settings->get('mail_reply_to_address', '')) }}"
+                           class="{{ $inputClass }} font-mono-code">
+                    <p class="text-[11px] text-slate-500 mt-1">Semua email (noreply maupun support) akan diarahkan ke alamat ini saat penerima membalas.</p>
+                </div>
+
+                <div>
+                    <label class="{{ $labelClass }}">Daftar Email Penerima Admin</label>
+                    <textarea name="mail_admin_addresses" rows="3"
+                              placeholder="{{ implode(', ', (array) config('mail.admin_addresses', ['support@vexahostcloud.my.id', 'vexahostcloudtech@gmail.com'])) }}"
+                              class="{{ $inputClass }} font-mono-code">{{ old('mail_admin_addresses', $settings->get('mail_admin_addresses', '')) }}</textarea>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Bebas domain. Pisahkan dengan koma atau baris baru. Alert order lunas, provisioning, dan SLA dikirim ke seluruh alamat ini.
+                    </p>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex justify-end">
+                <button type="submit"
+                        class="px-4 py-2 rounded-lg bg-black hover:bg-slate-800 text-white text-xs font-bold transition-colors">
+                    Simpan Pengaturan Email
+                </button>
+            </div>
+        </form>
+
+        <!-- Formulir Tes Kirim Email -->
+        <form action="{{ route('admin.settings.mail.test') }}" method="POST"
+              class="bg-white rounded-lg border border-slate-200 p-5 flex flex-col sm:flex-row items-stretch sm:items-end justify-between gap-4">
+            @csrf
+            <div class="space-y-1 flex-1">
+                <h3 class="font-bold text-slate-900 text-sm">Kirim Email Tes Identitas</h3>
+                <p class="text-xs text-slate-500">Uji pengiriman sinkron melalui Brevo SMTP untuk memastikan identitas From dan Reply-To berjalan semestinya.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Tipe Identitas</label>
+                        <select name="type" class="{{ $inputClass }}">
+                            <option value="noreply">Noreply ({{ \App\Support\MailIdentity::noreply()['address'] }})</option>
+                            <option value="support">Support ({{ \App\Support\MailIdentity::support()['address'] }})</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[11px] font-semibold text-slate-600 mb-1">Email Tujuan</label>
+                        <input type="email" name="to" required placeholder="admin@domain.com" class="{{ $inputClass }} font-mono-code">
+                    </div>
+                </div>
+            </div>
+            <button type="submit"
+                    class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-900 text-xs font-bold transition-colors shrink-0">
+                Kirim Email Tes
             </button>
         </form>
     </div>

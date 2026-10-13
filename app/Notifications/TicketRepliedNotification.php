@@ -12,6 +12,7 @@ use Illuminate\Notifications\Notification;
 class TicketRepliedNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public SupportTicket $ticket,
@@ -31,7 +32,7 @@ class TicketRepliedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        return (new MailMessage)
+        return $this->newMailMessage('support')
             ->subject("[Tiket #{$this->ticket->id}] Balasan dari Tim Support: {$this->ticket->subject}")
             ->view('emails.ticket-replied', [
                 'user' => $notifiable,

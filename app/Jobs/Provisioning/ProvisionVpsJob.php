@@ -134,8 +134,8 @@ class ProvisionVpsJob extends AbstractProvisioningJob
 
         // Kirim alert darurat ke admin jika provisioning otomatis gagal
         try {
-            $adminEmail = env('VEXAHOST_ADMIN_EMAIL', config('mail.from.address'));
-            if ($adminEmail) {
+            $adminEmails = \App\Support\MailIdentity::adminRecipients();
+            foreach ($adminEmails as $adminEmail) {
                 \Illuminate\Support\Facades\Notification::route('mail', $adminEmail)
                     ->notify(new \App\Notifications\AdminProvisioningFailedNotification($task, $error));
             }

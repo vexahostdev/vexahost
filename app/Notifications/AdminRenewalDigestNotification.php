@@ -16,6 +16,7 @@ use Illuminate\Notifications\Notification;
 class AdminRenewalDigestNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     /**
      * @param array<string, array<int, array<string, string>>> $digest
@@ -38,7 +39,7 @@ class AdminRenewalDigestNotification extends Notification
         $subject = "[Digest Perpanjangan] {$total} layanan perlu perhatian — "
             . now()->timezone('Asia/Jakarta')->format('d M Y');
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject($subject)
             ->view('emails.admin-renewal-digest', [
                 'subject' => $subject,

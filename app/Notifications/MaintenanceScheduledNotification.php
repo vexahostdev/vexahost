@@ -15,6 +15,7 @@ use Illuminate\Notifications\Notification;
 class MaintenanceScheduledNotification extends Notification
 {
     use Queueable;
+    use \App\Notifications\Concerns\UsesMailIdentity;
 
     public function __construct(
         public MaintenanceWindow $window
@@ -39,7 +40,7 @@ class MaintenanceScheduledNotification extends Notification
 
         $subject = 'Pemberitahuan Maintenance Terjadwal — ' . $start->format('d M Y');
 
-        return (new MailMessage)
+        return $this->newMailMessage()
             ->subject($subject)
             ->view('emails.maintenance-scheduled', [
                 'user' => $notifiable,

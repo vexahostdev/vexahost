@@ -345,6 +345,8 @@ Route::middleware(['auth', '2fa', 'org.context'])->group(function () {
         Route::post('/settings/support', [AdminSettingsController::class, 'updateSupport'])->name('settings.support');
         Route::post('/settings/notification', [AdminSettingsController::class, 'updateNotification'])->name('settings.notification');
         Route::post('/settings/notification/test', [AdminSettingsController::class, 'testNotification'])->middleware('throttle:5,1')->name('settings.notification.test');
+        Route::post('/settings/mail', [AdminSettingsController::class, 'updateMail'])->name('settings.mail');
+        Route::post('/settings/mail/test', [AdminSettingsController::class, 'testMail'])->middleware('throttle:5,1')->name('settings.mail.test');
         Route::post('/settings/maintenance', [AdminSettingsController::class, 'updateMaintenance'])->name('settings.maintenance');
         Route::post('/settings/bypass-token', [AdminSettingsController::class, 'regenerateBypassToken'])->name('settings.bypass-token');
         Route::post('/settings/components/{id}', [AdminSettingsController::class, 'updateComponent'])->name('settings.components.update');

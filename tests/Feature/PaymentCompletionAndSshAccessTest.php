@@ -52,9 +52,11 @@ class PaymentCompletionAndSshAccessTest extends TestCase
         ]);
 
         app(SettingsService::class)->setMany([
+            'mail_admin_addresses' => self::ADMIN_EMAIL,
             'admin_notification_email' => self::ADMIN_EMAIL,
             'admin_notification_whatsapp' => '0811-1111-1111',
         ]);
+        \App\Support\MailIdentity::flushCache();
 
         Http::fake([
             'https://api.xendit.co/*' => Http::response(['status' => 'PAID'], 200),
@@ -169,7 +171,11 @@ class PaymentCompletionAndSshAccessTest extends TestCase
 
     private function adminMailCount(string $class): int
     {
-        return Notification::sent(new AnonymousNotifiable, $class)->count();
+        return Notification::sent(
+            new AnonymousNotifiable,
+            $class,
+            fn ($n, $channels, $notifiable) => ($notifiable->routes['mail'] ?? null) === self::ADMIN_EMAIL
+        )->count();
     }
 
     // ===================== 1. Titik pusat "setelah lunas" =====================
@@ -346,8 +352,9 @@ class PaymentCompletionAndSshAccessTest extends TestCase
     public function test_reminder_is_retried_when_no_channel_succeeds(): void
     {
         app(SettingsService::class)->setMany(['admin_notification_whatsapp' => '']);
-        config(['vexahost.admin_email' => '']);
-        app(SettingsService::class)->set('admin_notification_email', '');
+        $mockAlerts = \Mockery::mock(\App\Services\AdminAlertService::class);
+        $mockAlerts->shouldReceive('fulfillmentReminder')->andReturn(false);
+        $this->app->instance(\App\Services\AdminAlertService::class, $mockAlerts);
 
         $customer = $this->customer();
         $order = Order::create(['customer_id' => $customer->id, 'organization_id' => $customer->current_organization_id,

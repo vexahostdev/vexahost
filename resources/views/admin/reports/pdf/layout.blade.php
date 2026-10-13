@@ -274,7 +274,7 @@
                         <td style="vertical-align: middle;">
                             <div class="brand-title">VEXAHOST INDONESIA</div>
                             <div class="brand-subtitle">Cloud Infrastructure, Autonomous AI & Database</div>
-                            <div class="brand-address">vexahostcloudtech@gmail.com • vexahostcloud.my.id</div>
+                            <div class="brand-address">{{ \App\Support\MailIdentity::contactEmail() }} • vexahostcloud.my.id</div>
                         </td>
                     </tr>
                 </table>

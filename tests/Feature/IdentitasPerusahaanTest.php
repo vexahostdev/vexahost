@@ -64,7 +64,7 @@ class IdentitasPerusahaanTest extends TestCase
             $this->get($alamat)
                 ->assertOk()
                 ->assertDontSee('Vexa Media Host')
-                ->assertDontSee('@vexahostcloud.my.id');
+                ->assertDontSee('vexahostcloudtech@gmail.com');
         }
     }
 }

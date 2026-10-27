@@ -537,6 +537,11 @@ class PaymentWebhookController extends Controller
             'amount' => $grossAmount,
         ]);
 
+        // Aplikasi lain yang terdaftar di config/xendit_forwards.php (mis. PSV- = Postivo).
+        if ($forwarded = app(\App\Services\Payments\XenditForwarder::class)->tryForward($externalId, $payload, $callbackToken)) {
+            return $forwarded;
+        }
+
         // ==========================================
         // ROUTE 1: FORWARD KE WAGATEWAY (Prefix WAG-)
         // ==========================================

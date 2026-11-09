@@ -329,11 +329,15 @@
                             <div class="mb-3">
                                 @if($instance->status === 'suspended')
                                     <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                        Layanan Ditangguhkan (Suspended)
+                                        @if($instance->isRenewalClosed())
+                                            Perpanjangan Ditutup
+                                        @else
+                                            Ditangguhkan · Perpanjang s/d {{ $instance->renewalDeadline()?->timezone('Asia/Jakarta')->format('d M, H:i') }} WIB
+                                        @endif
                                     </span>
                                 @elseif($instance->isInGracePeriod())
                                     <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200">
-                                        Masa Tenggang s/d {{ $instance->grace_period_ends_at?->timezone('Asia/Jakarta')->format('d M') }}
+                                        Masa Tenggang s/d {{ $instance->renewalDeadline()?->timezone('Asia/Jakarta')->format('d M, H:i') }} WIB
                                     </span>
                                 @elseif($instance->isExpired())
                                     <span class="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-red-50 text-red-800 border border-red-200">

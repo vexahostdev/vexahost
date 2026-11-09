@@ -7,19 +7,23 @@ use App\Models\VpsInstance;
 /**
  * PHASE 3 - Penentu masa tenggang per jenis produk.
  *
- * Angka tenggang tidak boleh tunggal. Supplier menghapus VPS pada hari ke-7,
+ * Angka tenggang tidak boleh tunggal. Supplier menghentikan VPS pada H+3,
  * sedangkan database dan aplikasi pada hari ke-30. Tenggang yang kita janjikan
  * ke pelanggan selalu lebih pendek, agar tersisa ruang untuk bertindak
  * sebelum penghapusan permanen di sisi supplier terjadi.
+ *
+ * Batas akhir tenggang bersifat mutlak: begitu terlewati, perpanjangan dan
+ * pembayarannya tertutup (lihat isRenewalClosed).
  */
 class RenewalService
 {
     /**
      * Batas penghapusan di sisi Supplier, dalam hari.
-     * Sumber: Terms of Service Supplier pasal 11.
+     * VPS: pemberitahuan Supplier (November 2026), dihentikan/dihapus pada H+3.
+     * Database dan aplikasi: Terms of Service Supplier pasal 11.
      */
     public const SUPPLIER_LIMITS = [
-        'vps' => 7,
+        'vps' => 3,
         'database' => 30,
         'app' => 30,
     ];
@@ -62,9 +66,8 @@ class RenewalService
     }
 
     /**
-     * Tenggang untuk order yang sedang diprovision. Menggantikan angka 7 hari
-     * yang dulu tertulis langsung di alur provisioning: 7 hari justru batas
-     * penghapusan VPS di Supplier, sehingga tidak menyisakan ruang aman.
+     * Tenggang untuk order yang sedang diprovision, mengikuti batas per produk
+     * agar selalu menyisakan ruang aman sebelum penghapusan di Supplier.
      */
     public function graceDaysForOrder(\App\Models\Order $order): int
     {
@@ -84,10 +87,10 @@ class RenewalService
         $configured = match ($type) {
             'database' => $this->settings->int('renewal_grace_days_database', 25),
             'app' => $this->settings->int('renewal_grace_days_app', 25),
-            default => $this->settings->int('renewal_grace_days_vps', 5),
+            default => $this->settings->int('renewal_grace_days_vps', 2),
         };
 
-        $limit = self::SUPPLIER_LIMITS[$type] ?? 7;
+        $limit = self::SUPPLIER_LIMITS[$type] ?? self::SUPPLIER_LIMITS['vps'];
 
         // Pengaman keras: tenggang kita tidak boleh menyentuh batas supplier.
         // Bila pengaturan terlanjur diisi terlalu besar, dipangkas di sini.
@@ -101,7 +104,57 @@ class RenewalService
     {
         $type = $this->productType($instance);
 
-        return (self::SUPPLIER_LIMITS[$type] ?? 7) - $this->graceDaysForType($type);
+        return (self::SUPPLIER_LIMITS[$type] ?? self::SUPPLIER_LIMITS['vps']) - $this->graceDaysForType($type);
+    }
+
+    /**
+     * Batas akhir perpanjangan. Dihitung langsung dari masa aktif dan aturan
+     * terbaru, bukan dari kolom tersimpan yang bisa tertinggal aturan lama.
+     */
+    public function renewalDeadlineFor(VpsInstance $instance): ?\Illuminate\Support\Carbon
+    {
+        return $instance->expires_at?->copy()->addDays($this->graceDaysFor($instance));
+    }
+
+    /**
+     * Apakah perpanjangan sudah tertutup untuk pembayaran baru, saat ini.
+     */
+    public function isRenewalClosed(VpsInstance $instance): bool
+    {
+        if ($instance->status === 'terminated') {
+            return true;
+        }
+
+        $deadline = $this->renewalDeadlineFor($instance);
+
+        return $deadline !== null && now()->greaterThan($deadline);
+    }
+
+    /**
+     * Apakah pembayaran pada waktu tersebut terlambat.
+     *
+     * Berbeda dari isRenewalClosed: layanan yang diterminasi karena tagihan masih
+     * bisa diselamatkan bila bukti bayarnya sebelum batas (misal admin baru
+     * memverifikasi transfer setelah terminasi). Terminasi karena sebab lain
+     * tidak pernah bisa dibatalkan oleh pembayaran.
+     */
+    public function isPaymentTooLate(VpsInstance $instance, \Carbon\CarbonInterface $paidAt): bool
+    {
+        if ($instance->status === 'terminated' && !$this->wasTerminatedForNonPayment($instance)) {
+            return true;
+        }
+
+        $deadline = $this->renewalDeadlineFor($instance);
+
+        return $deadline !== null && $paidAt->greaterThan($deadline);
+    }
+
+    private function wasTerminatedForNonPayment(VpsInstance $instance): bool
+    {
+        return \App\Models\RenewalReminder::where('vps_instance_id', $instance->id)
+            ->where('stage', \App\Models\RenewalReminder::STAGE_GRACE_ENDED)
+            ->where('period_expires_at', $instance->expires_at)
+            ->exists();
     }
 
     /**
@@ -163,6 +216,24 @@ class RenewalService
                     ?? ($locked->vps_instance_id ? VpsInstance::find($locked->vps_instance_id) : null);
             }
 
+            if ($locked->renewal_rejected_at) {
+                $order->setRawAttributes($locked->getAttributes(), true);
+
+                return null;
+            }
+
+            // Patokan waktu bayar, bukan waktu diproses: pelanggan yang membayar
+            // tepat waktu tidak boleh ditolak hanya karena webhook datang terlambat.
+            $target = $locked->resolved_instance
+                ?? ($locked->vps_instance_id ? VpsInstance::find($locked->vps_instance_id) : null);
+
+            if ($target && $this->isPaymentTooLate($target, $locked->paymentMadeAt())) {
+                $this->rejectLateRenewal($locked, $target);
+                $order->setRawAttributes($locked->fresh()->getAttributes(), true);
+
+                return null;
+            }
+
             $instance = $this->applyRenewal($locked);
 
             if ($instance) {
@@ -173,6 +244,62 @@ class RenewalService
 
             return $instance;
         });
+    }
+
+    /**
+     * Pembayaran masuk setelah batas akhir: masa aktif tidak ditambah, order
+     * dibatalkan, dan invoice tetap lunas agar admin bisa memprosesnya sebagai
+     * refund transfer manual di Billing Center.
+     *
+     * paid_notified_at ikut diisi supaya pelanggan tidak menerima surel
+     * "pembayaran diterima" yang menyesatkan.
+     */
+    private function rejectLateRenewal(\App\Models\Order $order, VpsInstance $instance): void
+    {
+        $order->forceFill([
+            'renewal_rejected_at' => now(),
+            'paid_notified_at' => $order->paid_notified_at ?? now(),
+        ])->save();
+
+        $stateMachine = app(OrderStateMachine::class);
+
+        if ($stateMachine->canTransition($order->status, 'cancelled')) {
+            $stateMachine->transition($order, 'cancelled', [
+                'reason' => 'Pembayaran perpanjangan masuk setelah batas akhir. Dana perlu dikembalikan.',
+                'actor_type' => 'system',
+            ]);
+        }
+
+        $orderId = $order->id;
+        $instanceId = $instance->id;
+
+        \Illuminate\Support\Facades\DB::afterCommit(function () use ($orderId, $instanceId) {
+            $this->notifyLateRenewal($orderId, $instanceId);
+        });
+    }
+
+    private function notifyLateRenewal(int $orderId, int $instanceId): void
+    {
+        $order = \App\Models\Order::with('customer')->find($orderId);
+        $instance = VpsInstance::find($instanceId);
+
+        if (!$order || !$instance) {
+            return;
+        }
+
+        $deadline = $this->renewalDeadlineFor($instance);
+
+        try {
+            $order->customer?->notify(new \App\Notifications\LateRenewalPaymentNotification($order, $instance, $deadline));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('renewal.late_payment_notify_failed', ['order_id' => $orderId, 'error' => $e->getMessage()]);
+        }
+
+        try {
+            app(AdminAlertService::class)->lateRenewalPayment($order, $instance, $deadline);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('renewal.late_payment_alert_failed', ['order_id' => $orderId, 'error' => $e->getMessage()]);
+        }
     }
 
     private function applyRenewal(\App\Models\Order $order): ?VpsInstance
@@ -204,8 +331,9 @@ class RenewalService
         $newExpiresAt = $baseDate->addMonths($months);
         $instance->expires_at = $newExpiresAt;
 
-        // Jika VPS sebelumnya suspended karena terlambat bayar, aktifkan kembali
-        if ($instance->status === 'suspended') {
+        // Aktifkan kembali. Status terminated hanya sampai di sini bila terminasinya
+        // karena tagihan dan bukti bayarnya sebelum batas (lihat isPaymentTooLate).
+        if (in_array($instance->status, ['suspended', 'terminated'], true)) {
             $instance->status = 'running';
         }
 

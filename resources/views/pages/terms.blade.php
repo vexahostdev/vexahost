@@ -356,17 +356,17 @@
                         <p>
                             5.1. <strong>Sistem Pembayaran Prabayar (Prepaid):</strong> Seluruh paket sewa server ditagihkan di awal periode pemakaian berdasarkan siklus langganan yang dipilih (bulanan).
                         </p>
-                        @php($graceVps = app(\App\Services\SettingsService::class)->int('renewal_grace_days_vps', 5))
-                        @php($graceDb = app(\App\Services\SettingsService::class)->int('renewal_grace_days_database', 25))
-                        @php($graceApp = app(\App\Services\SettingsService::class)->int('renewal_grace_days_app', 25))
+                        @php($graceVps = app(\App\Services\RenewalService::class)->graceDaysForType('vps'))
+                        @php($graceDb = app(\App\Services\RenewalService::class)->graceDaysForType('database'))
+                        @php($graceApp = app(\App\Services\RenewalService::class)->graceDaysForType('app'))
                         <p>
-                            5.2. <strong>Pengingat Perpanjangan:</strong> Pengingat perpanjangan dikirim otomatis melalui email dan WhatsApp pada 7 (tujuh), 3 (tiga), dan 1 (satu) hari sebelum tanggal jatuh tempo, serta pada hari jatuh tempo. Perpanjangan dapat dilakukan kapan saja dari menu Tagihan di dashboard; sisa masa aktif tidak hangus.
+                            5.2. <strong>Pengingat Perpanjangan:</strong> Pengingat perpanjangan dikirim otomatis melalui email dan WhatsApp pada 3 (tiga) hari sebelum tanggal jatuh tempo dan kurang dari 24 (dua puluh empat) jam sebelum masa tenggang berakhir. Perpanjangan dapat dilakukan kapan saja dari menu Tagihan di dashboard; sisa masa aktif tidak hangus.
                         </p>
                         <p>
                             5.3. <strong>Suspensi Layanan:</strong> Apabila perpanjangan belum dibayar hingga tanggal jatuh tempo, layanan berstatus suspend dan dapat dinonaktifkan sewaktu-waktu sejak tanggal tersebut. Layanan dipulihkan setelah pembayaran perpanjangan dikonfirmasi selama masa tenggang masih berlaku.
                         </p>
                         <p>
-                            5.4. <strong>Masa Tenggang &amp; Terminasi Permanen:</strong> VexaHost memberikan masa tenggang (grace period) selama {{ $graceVps }} hari kalender setelah tanggal jatuh tempo untuk layanan VPS, serta {{ $graceDb }} hari untuk Managed Database dan {{ $graceApp }} hari untuk paket aplikasi. Jika dalam jangka waktu tersebut tidak ada pembayaran yang dikonfirmasi, layanan diterminasi dan disk virtual server dihapus secara permanen tanpa kemungkinan pemulihan data (irreversible deletion).
+                            5.4. <strong>Masa Tenggang &amp; Terminasi Permanen:</strong> VexaHost memberikan masa tenggang (grace period) selama {{ $graceVps }} hari kalender setelah tanggal jatuh tempo untuk layanan VPS, serta {{ $graceDb }} hari untuk Managed Database dan {{ $graceApp }} hari untuk paket aplikasi. Masa tenggang dihitung tepat sejak waktu jatuh tempo. Begitu masa tenggang berakhir, perpanjangan dan pembayaran ditutup secara otomatis. Jika dalam jangka waktu tersebut tidak ada pembayaran yang dikonfirmasi, layanan diterminasi dan disk virtual server dihapus secara permanen tanpa kemungkinan pemulihan data (irreversible deletion). Pembayaran yang diterima setelah masa tenggang berakhir tidak diproses dan dananya dikembalikan.
                         </p>
                         <p>
                             5.5. <strong>Waktu Penyerahan Layanan:</strong> Akses server diserahkan paling lambat 1&times;24 jam sejak pembayaran terkonfirmasi (umumnya lebih cepat). Masa aktif dihitung sejak pembayaran terkonfirmasi. Apabila penyerahan melewati 1&times;24 jam, masa aktif dihitung sejak server diserahkan sebagai kompensasi, tanpa perlu diajukan.

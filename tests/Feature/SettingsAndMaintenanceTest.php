@@ -142,7 +142,7 @@ class SettingsAndMaintenanceTest extends TestCase
     }
 
     /**
-     * Tenggang VPS wajib di bawah 7 hari, batas penghapusan di sisi Supplier.
+     * Tenggang VPS wajib di bawah H+3, batas penghentian di sisi Supplier.
      */
     public function test_vps_grace_period_cannot_reach_supplier_limit(): void
     {
@@ -150,7 +150,7 @@ class SettingsAndMaintenanceTest extends TestCase
             ->post('/admin/settings/notification', [
                 'admin_notification_email' => 'admin@vexahostcloud.my.id',
                 'fulfillment_sla_minutes' => 120,
-                'renewal_grace_days_vps' => 7,
+                'renewal_grace_days_vps' => 3,
                 'renewal_grace_days_database' => 25,
                 'renewal_grace_days_app' => 25,
             ])

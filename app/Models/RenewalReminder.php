@@ -28,6 +28,7 @@ class RenewalReminder extends Model
     public const STAGE_H3 = 'h_minus_3';
     public const STAGE_H1 = 'h_minus_1';
     public const STAGE_H0 = 'h_zero';
+    public const STAGE_GRACE_FINAL = 'grace_final';
     public const STAGE_GRACE_ENDED = 'grace_ended';
 
     public const STAGES = [
@@ -35,6 +36,7 @@ class RenewalReminder extends Model
         self::STAGE_H3,
         self::STAGE_H1,
         self::STAGE_H0,
+        self::STAGE_GRACE_FINAL,
         self::STAGE_GRACE_ENDED,
     ];
 
@@ -49,6 +51,7 @@ class RenewalReminder extends Model
             self::STAGE_H3 => 'H-3',
             self::STAGE_H1 => 'H-1',
             self::STAGE_H0 => 'Jatuh Tempo',
+            self::STAGE_GRACE_FINAL => 'Peringatan Terakhir',
             self::STAGE_GRACE_ENDED => 'Tenggang Berakhir',
             default => $stage,
         };

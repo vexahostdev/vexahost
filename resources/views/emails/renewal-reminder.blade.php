@@ -9,8 +9,11 @@
 </h1>
 
 <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #52525b;">
-    Halo {{ $user->name ?? 'Pelanggan' }},<br>
+    Halo {{ $user->full_name ?? 'Pelanggan' }},<br>
     {{ $bodyText }}
+    @if(!$isTerminal)
+        <br><br>Jika ingin melanjutkan, segera klik tombol di bawah ini.
+    @endif
 </p>
 
 <!-- Rincian Layanan -->
@@ -39,7 +42,7 @@
                 </tr>
                 @if(!$isTerminal)
                 <tr>
-                    <td style="padding: 6px 0; color: #71717a;">Batas Pemulihan</td>
+                    <td style="padding: 6px 0; color: #71717a;">Akan Dihapus Pada</td>
                     <td style="padding: 6px 0; color: #18181b; font-weight: 600;">{{ $graceEndText }}</td>
                 </tr>
                 @endif
@@ -48,7 +51,7 @@
     </tr>
 </table>
 
-@if($stage === 'h_zero')
+@if($stage === 'grace_final')
 <!-- Peringatan batas pemulihan -->
 <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; margin-bottom: 24px;">
     <tr>
@@ -73,7 +76,7 @@
 <table border="0" cellpadding="0" cellspacing="0" style="margin-bottom: 8px;">
     <tr>
         <td align="center" style="border-radius: 6px; background-color: #000000;">
-            <a href="{{ rtrim(config('app.url', 'https://vexahostcloud.my.id'), '/') }}/dashboard/billing"
+            <a href="{{ $isTerminal ? rtrim(config('app.url', 'https://vexahostcloud.my.id'), '/') . '/' : $renewUrl }}"
                target="_blank" rel="noopener noreferrer" class="action-button"
                style="display: inline-block; padding: 12px 28px; font-size: 13px; font-weight: 700; color: #ffffff; text-decoration: none; border-radius: 6px;">
                 {{ $isTerminal ? 'Pesan Layanan Baru' : 'Perpanjang Sekarang' }}

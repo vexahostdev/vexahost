@@ -80,7 +80,11 @@
         <div class="p-4 rounded-lg bg-slate-100 border border-slate-300 text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="text-xs">
                 <strong class="font-bold text-sm block">Instance VPS Ditangguhkan (Suspended)</strong>
-                Layanan VPS ini sedang ditangguhkan karena melewati jatuh tempo pembayaran. Perpanjang sekarang untuk mengaktifkan kembali server.
+                @if($vps->isRenewalClosed())
+                    Batas akhir perpanjangan layanan ini sudah lewat, sehingga perpanjangan dan pembayaran telah ditutup. Silakan lakukan pemesanan layanan baru.
+                @else
+                    Layanan VPS ini sedang ditangguhkan karena melewati jatuh tempo pembayaran. Perpanjang sebelum <strong>{{ $vps->renewalDeadline()?->timezone('Asia/Jakarta')->format('d M Y, H:i') }} WIB</strong> untuk mengaktifkan kembali server. Lewat dari waktu tersebut, pembayaran ditutup otomatis dan seluruh data dihapus permanen.
+                @endif
             </div>
             @if($vps->canBeRenewed())
                 <button type="button" @click="renewalModal = true" class="px-3.5 py-1.5 rounded-lg bg-black text-white hover:bg-neutral-800 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer">
@@ -92,7 +96,7 @@
         <div class="p-4 rounded-lg bg-slate-100 border border-slate-300 text-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div class="text-xs">
                 <strong class="font-bold text-sm block">Masa Tenggang Berlangganan (Grace Period)</strong>
-                Masa aktif VPS telah jatuh tempo. Anda memiliki masa tenggang hingga <strong>{{ $vps->grace_period_ends_at?->timezone('Asia/Jakarta')->format('d M Y, H:i') }}</strong> sebelum layanan dihentikan otomatis.
+                Masa aktif VPS telah jatuh tempo. Anda memiliki masa tenggang hingga <strong>{{ $vps->renewalDeadline()?->timezone('Asia/Jakarta')->format('d M Y, H:i') }} WIB</strong>. Lewat dari waktu tersebut, pembayaran ditutup otomatis dan seluruh data dihapus permanen.
             </div>
             @if($vps->canBeRenewed())
                 <button type="button" @click="renewalModal = true" class="px-3.5 py-1.5 rounded-lg bg-black text-white hover:bg-neutral-800 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer">
@@ -941,7 +945,7 @@ WEB_MANAGER_URL={{ $webMgrUrl }} (CloudBeaver)
                 <div class="p-4 rounded-lg bg-slate-50 border border-slate-200">
                     <span class="text-xs text-slate-500 block mb-1">Batas Masa Tenggang</span>
                     <p class="font-bold text-slate-900 text-sm">
-                        {{ $vps->grace_period_ends_at ? $vps->grace_period_ends_at->timezone('Asia/Jakarta')->format('d M Y') : '—' }}
+                        {{ $vps->renewalDeadline() ? $vps->renewalDeadline()->timezone('Asia/Jakarta')->format('d M Y, H:i') . ' WIB' : '—' }}
                     </p>
                     <p class="text-[11px] text-slate-500 mt-1">
                         Masa tenggang: {{ $graceDays }} hari setelah jatuh tempo

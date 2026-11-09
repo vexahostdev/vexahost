@@ -53,10 +53,9 @@ class AdminRenewalDigestNotification extends Notification
     protected function sectionLabels(): array
     {
         return [
-            'h_minus_7' => 'Jatuh Tempo 7 Hari Lagi',
             'h_minus_3' => 'Jatuh Tempo 3 Hari Lagi',
-            'h_minus_1' => 'Jatuh Tempo Besok',
             'h_zero' => 'Jatuh Tempo Hari Ini — Disuspend',
+            'grace_final' => 'Peringatan Terakhir — Batas Akhir < 24 Jam',
             'grace_ended' => 'Tenggang Berakhir — Diterminasi',
         ];
     }

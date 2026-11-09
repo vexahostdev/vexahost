@@ -61,6 +61,8 @@ class Order extends Model
         // Penjaga "setelah lunas" (PaymentCompletionService).
         'paid_notified_at',
         'renewal_applied_at',
+        'renewal_rejected_at',
+        'payment_received_at',
         'admin_reminder_count',
         'admin_reminded_at',
     ];
@@ -71,6 +73,8 @@ class Order extends Model
         'sla_alerted_at' => 'datetime',
         'paid_notified_at' => 'datetime',
         'renewal_applied_at' => 'datetime',
+        'renewal_rejected_at' => 'datetime',
+        'payment_received_at' => 'datetime',
         'admin_reminded_at' => 'datetime',
         'admin_reminder_count' => 'integer',
         'starts_at' => 'datetime',
@@ -255,6 +259,41 @@ class Order extends Model
         $paidAt = $this->paid_at ? \Illuminate\Support\Carbon::parse($this->paid_at) : null;
 
         return ($paidAt && $paidAt->lessThanOrEqualTo(now())) ? $paidAt->copy() : now();
+    }
+
+    /**
+     * Waktu pelanggan benar-benar membayar. Tanpa data dari gateway atau admin,
+     * memakai waktu sistem memproses.
+     */
+    public function paymentMadeAt(): \Illuminate\Support\Carbon
+    {
+        return $this->payment_received_at
+            ? \Illuminate\Support\Carbon::parse($this->payment_received_at)
+            : $this->activationStartsAt();
+    }
+
+    /**
+     * Catat waktu bayar dari gateway/admin. Tidak menyimpan: nilai yang tidak
+     * terbaca, di masa depan, atau sebelum order dibuat.
+     */
+    public function recordPaymentReceivedAt(mixed $raw, string $timezone = 'Asia/Jakarta'): void
+    {
+        if (empty($raw) || !is_string($raw)) {
+            return;
+        }
+
+        try {
+            $at = \Illuminate\Support\Carbon::parse($raw, $timezone);
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        if ($at->isFuture() || ($this->created_at && $at->lessThan($this->created_at))) {
+            return;
+        }
+
+        // Disimpan dalam zona aplikasi: Eloquent menulis jam apa adanya.
+        $this->payment_received_at = $at->setTimezone(config('app.timezone'));
     }
 
     /** Janji waktu setup ke pelanggan (Ketentuan Layanan pasal 5.5). */

@@ -17,23 +17,27 @@ use Illuminate\Support\Facades\Notification;
 /**
  * PHASE 3 - Pengingat perpanjangan dan perpindahan siklus hidup layanan.
  *
- * Lima tahap: H-7, H-3, H-1, jatuh tempo, dan akhir tenggang.
- * H-7 sengaja ada agar pelanggan membayar sebelum perpanjangan di Supplier
- * (auto-renew Supplier dimatikan; Supplier biasanya menagih H-3).
+ * Pesan ke pelanggan tiga tahap: H-3, peringatan terakhir (kurang dari 24 jam
+ * sebelum batas akhir), dan lewat batas. Saat jatuh tempo layanan tetap disuspend
+ * dan masuk digest admin, tetapi pelanggan tidak dikirimi pesan.
+ *
+ * Dijalankan tiap jam pada jam wajar agar peringatan terakhir tidak datang
+ * mepet batas. Pembayaran sendiri ditutup tepat waktu oleh RenewalService,
+ * tidak bergantung pada jadwal ini.
  *
  * Idempotensi dijamin oleh indeks unik (vps_instance_id, stage, period_expires_at)
  * di tabel renewal_reminders. Bila command berjalan dua kali, penulisan kedua
  * ditolak basis data dan surel tidak dikirim ulang.
  *
- * Pemberitahuan ke admin selalu berbentuk SATU digest harian, bukan satu surel
- * per layanan, karena panel ini dioperasikan satu orang.
+ * Pemberitahuan ke admin berbentuk SATU digest per jalannya command, hanya bila
+ * ada tahap baru, bukan satu surel per layanan.
  */
 class SendRenewalRemindersCommand extends Command
 {
     protected $signature = 'renewal:remind
         {--dry-run : Hanya tampilkan rencana tindakan, tidak mengirim apa pun}';
 
-    protected $description = 'Kirim pengingat perpanjangan H-7/H-3/H-1/H-0 dan pindahkan status instance yang jatuh tempo.';
+    protected $description = 'Kirim pengingat perpanjangan (H-3, peringatan terakhir, lewat batas) dan pindahkan status instance yang jatuh tempo.';
 
     public function __construct(
         protected RenewalService $renewal,
@@ -47,17 +51,17 @@ class SendRenewalRemindersCommand extends Command
         $dry = (bool) $this->option('dry-run');
 
         $digest = [
-            'h_minus_7' => [],
             'h_minus_3' => [],
-            'h_minus_1' => [],
             'h_zero' => [],
+            'grace_final' => [],
             'grace_ended' => [],
         ];
 
-        $this->processUpcoming(RenewalReminder::STAGE_H7, 7, $dry, $digest);
         $this->processUpcoming(RenewalReminder::STAGE_H3, 3, $dry, $digest);
-        $this->processUpcoming(RenewalReminder::STAGE_H1, 1, $dry, $digest);
         $this->processDue($dry, $digest);
+        // Setelah processDue, agar layanan yang baru disuspend mepet batas tetap
+        // langsung mendapat peringatan terakhir.
+        $this->processGraceFinal($dry, $digest);
         $this->processGraceEnded($dry, $digest);
 
         $total = array_sum(array_map('count', $digest));
@@ -72,7 +76,7 @@ class SendRenewalRemindersCommand extends Command
     }
 
     /**
-     * Tahap H-3 dan H-1: layanan yang akan jatuh tempo dalam N hari.
+     * Tahap H-3: layanan yang akan jatuh tempo dalam N hari.
      */
     protected function processUpcoming(string $stage, int $days, bool $dry, array &$digest): void
     {
@@ -88,12 +92,38 @@ class SendRenewalRemindersCommand extends Command
         $this->info("H-{$days}: {$instances->count()} layanan akan jatuh tempo.");
 
         foreach ($instances as $instance) {
+            // Tanggal batas akhir di pesan harus mengikuti aturan terbaru.
+            if (!$dry) {
+                $this->renewal->applyGracePeriod($instance);
+            }
+
             $this->handleStage($instance, $stage, $days, $dry, $digest);
         }
     }
 
     /**
-     * Tahap jatuh tempo: masa aktif habis, layanan disuspend.
+     * Peringatan terakhir: layanan disuspend dan batas akhir kurang dari 24 jam lagi.
+     */
+    protected function processGraceFinal(bool $dry, array &$digest): void
+    {
+        $instances = VpsInstance::with(['customer', 'order.vpsSpec'])
+            ->where('status', 'suspended')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->whereNotNull('grace_period_ends_at')
+            ->where('grace_period_ends_at', '>', now())
+            ->where('grace_period_ends_at', '<=', now()->addDay())
+            ->get();
+
+        $this->info("Peringatan terakhir: {$instances->count()} layanan.");
+
+        foreach ($instances as $instance) {
+            $this->handleStage($instance, RenewalReminder::STAGE_GRACE_FINAL, 0, $dry, $digest);
+        }
+    }
+
+    /**
+     * Tahap jatuh tempo: masa aktif habis, layanan disuspend tanpa pesan ke pelanggan.
      */
     protected function processDue(bool $dry, array &$digest): void
     {
@@ -115,7 +145,7 @@ class SendRenewalRemindersCommand extends Command
             // Tenggang dihitung ulang agar mengikuti pengaturan terbaru.
             $this->renewal->applyGracePeriod($instance);
 
-            if ($this->handleStage($instance, RenewalReminder::STAGE_H0, 0, false, $digest)) {
+            if ($this->handleStage($instance, RenewalReminder::STAGE_H0, 0, false, $digest, false)) {
                 $instance->update(['status' => 'suspended']);
                 $this->line("  ✓ Suspend instance #{$instance->id} ({$instance->hostname})");
             }
@@ -161,7 +191,8 @@ class SendRenewalRemindersCommand extends Command
         string $stage,
         int $days,
         bool $dry,
-        array &$digest
+        array &$digest,
+        bool $notifyCustomer = true
     ): bool {
         if ($dry) {
             $this->line("  → [dry] akan kirim {$stage} untuk instance #{$instance->id}");
@@ -184,7 +215,7 @@ class SendRenewalRemindersCommand extends Command
 
         $customer = $instance->customer;
 
-        if ($customer && $customer->email) {
+        if ($notifyCustomer && $customer && $customer->email) {
             try {
                 $customer->notify(new InstanceRenewalReminderNotification(
                     $instance,
@@ -244,10 +275,9 @@ class SendRenewalRemindersCommand extends Command
     protected function sendAdminDigestWhatsApp(array $digest): void
     {
         $labels = [
-            'h_minus_7' => 'Jatuh tempo 7 hari lagi',
             'h_minus_3' => 'Jatuh tempo 3 hari lagi',
-            'h_minus_1' => 'Jatuh tempo besok',
             'h_zero' => 'Jatuh tempo hari ini — disuspend',
+            'grace_final' => 'Peringatan terakhir — batas akhir < 24 jam',
             'grace_ended' => 'Tenggang berakhir — diterminasi',
         ];
 

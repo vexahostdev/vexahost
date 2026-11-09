@@ -504,6 +504,9 @@ class DashboardController extends Controller
             ->findOrFail($id);
 
         if (!$instance->canBeRenewed()) {
+            if ($instance->isRenewalClosed()) {
+                return back()->with('error', 'Batas akhir perpanjangan layanan ini sudah lewat, sehingga perpanjangan dan pembayaran telah ditutup. Silakan lakukan pemesanan layanan baru.');
+            }
             if ($instance->isEolWithoutReplacement()) {
                 return back()->with('error', 'Paket server ini telah dihentikan secara permanen (End-of-Life). Silakan hubungi tim dukungan kami untuk proses migrasi.');
             }

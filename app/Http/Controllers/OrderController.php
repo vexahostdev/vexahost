@@ -753,6 +753,11 @@ class OrderController extends Controller
             $order->refresh();
         }
 
+        if ($order->renewal_rejected_at && !Auth::user()->is_admin) {
+            return redirect()->route('dashboard.billing')
+                ->with('error', 'Pembayaran Anda masuk setelah batas akhir perpanjangan, sehingga tidak dapat diproses. Dana akan dikembalikan oleh tim kami ke rekening atau dompet digital asal.');
+        }
+
         // Jika pesanan belum lunas dan bukan admin, arahkan ke halaman status pembayaran
         if (!$order->paid_at && !in_array($order->status, ['paid', 'provisioning', 'active'], true) && !Auth::user()->is_admin) {
             return redirect()->route('order.payment.status', $order->id);
@@ -891,6 +896,14 @@ class OrderController extends Controller
         if ($order->isRenewal()) {
             $instance = $order->resolved_instance ?? ($order->vps_instance_id ? \App\Models\VpsInstance::find($order->vps_instance_id) : $order->vpsInstance);
             $spec = $order->vpsSpec;
+
+            // Halaman bayar ditutup, tetapi order sengaja tetap pending: bila pembayaran
+            // masih masuk dari tautan gateway yang terbuka, webhook-nya tetap tercatat
+            // dan dana bisa dikembalikan, bukan hilang karena transisi ditolak.
+            if ($instance && $instance->isRenewalClosed()) {
+                return redirect()->route('dashboard.vps.show', $instance->id)
+                    ->with('error', 'Batas akhir perpanjangan layanan ini sudah lewat, sehingga pembayaran telah ditutup. Silakan lakukan pemesanan layanan baru.');
+            }
 
             if ($spec && !$spec->is_renewable) {
                 // Paket lama End-of-Life

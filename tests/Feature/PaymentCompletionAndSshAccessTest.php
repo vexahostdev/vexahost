@@ -12,6 +12,7 @@ use App\Notifications\AdminNewPaidOrderNotification;
 use App\Notifications\PaymentReceivedNotification;
 use App\Notifications\VpsProvisionedNotification;
 use App\Notifications\VpsSshUsernameChangedNotification;
+use App\Services\Payments\MidtransService;
 use App\Services\Payments\XenditService;
 use App\Services\RenewalService;
 use App\Services\SettingsService;
@@ -147,16 +148,166 @@ class PaymentCompletionAndSshAccessTest extends TestCase
         ], $attrs));
     }
 
-    private function xenditWebhook(Order $order)
+    private function xenditWebhook(Order $order, array $extra = [])
     {
         return $this->withHeaders(['x-callback-token' => 'tok_test'])
-            ->postJson('/api/payment/xendit/webhook', [
+            ->postJson('/api/payment/xendit/webhook', array_merge([
                 'id' => 'inv_' . $order->id,
                 'external_id' => 'VH-ORD-' . $order->id,
                 'status' => 'PAID',
                 'amount' => 150000,
                 'payment_channel' => 'QRIS',
-            ]);
+            ], $extra));
+    }
+
+    /** VPS tersuspend yang batas akhirnya 1 jam lagi, dengan order perpanjangan pending. */
+    private function renewalNearDeadline(User $customer, array $vpsAttrs = []): array
+    {
+        $expires = now()->subDays(2)->addHour()->startOfSecond();
+        $vps = $this->runningVps($customer, array_merge(['status' => 'suspended', 'expires_at' => $expires], $vpsAttrs));
+        $order = $this->pendingXenditOrder($customer, ['order_type' => 'renewal', 'vps_instance_id' => $vps->id]);
+
+        return [$vps, $order, $expires->copy()->addDays(2)];
+    }
+
+    public function test_webhook_arriving_after_deadline_honours_gateway_payment_time(): void
+    {
+        [$vps, $order, $deadline] = $this->renewalNearDeadline($this->customer());
+        $paidAt = $deadline->copy()->subMinutes(10);
+
+        $this->travelTo($deadline->copy()->addHours(3));
+        $this->xenditWebhook($order, ['paid_at' => $paidAt->copy()->utc()->toIso8601String()])->assertOk();
+
+        $fresh = $order->fresh();
+        $this->assertNull($fresh->renewal_rejected_at);
+        $this->assertNotNull($fresh->renewal_applied_at);
+        $this->assertTrue($fresh->payment_received_at->equalTo($paidAt));
+        $this->assertSame('running', $vps->fresh()->status);
+    }
+
+    public function test_webhook_with_payment_time_after_deadline_is_rejected(): void
+    {
+        [$vps, $order, $deadline] = $this->renewalNearDeadline($this->customer());
+
+        $this->travelTo($deadline->copy()->addHours(3));
+        $this->xenditWebhook($order, ['paid_at' => $deadline->copy()->addMinute()->utc()->toIso8601String()])->assertOk();
+
+        $this->assertNotNull($order->fresh()->renewal_rejected_at);
+        $this->assertSame('cancelled', $order->fresh()->status);
+        $this->assertSame('suspended', $vps->fresh()->status);
+    }
+
+    public function test_webhook_without_payment_time_falls_back_to_processing_time(): void
+    {
+        [$vps, $order, $deadline] = $this->renewalNearDeadline($this->customer());
+
+        $this->travelTo($deadline->copy()->addHours(3));
+        $this->xenditWebhook($order)->assertOk();
+
+        $this->assertNull($order->fresh()->payment_received_at);
+        $this->assertNotNull($order->fresh()->renewal_rejected_at);
+        $this->assertSame('suspended', $vps->fresh()->status);
+    }
+
+    public function test_midtrans_settlement_time_is_read_as_jakarta_time(): void
+    {
+        [$vps, $order, $deadline] = $this->renewalNearDeadline($this->customer());
+        $paidAt = $deadline->copy()->subMinutes(10);
+
+        $this->travelTo($deadline->copy()->addHours(3));
+        MidtransService::settleOrderFromMidtrans($order, [
+            'transaction_id' => 'mid-' . $order->id,
+            'gross_amount' => '150000.00',
+            'payment_type' => 'qris',
+            'settlement_time' => $paidAt->copy()->timezone('Asia/Jakarta')->format('Y-m-d H:i:s'),
+        ], 'ORDER-' . $order->id);
+
+        $this->assertTrue($order->fresh()->payment_received_at->equalTo($paidAt));
+        $this->assertNull($order->fresh()->renewal_rejected_at);
+        $this->assertSame('running', $vps->fresh()->status);
+    }
+
+    public function test_future_or_garbage_payment_time_is_ignored(): void
+    {
+        [, $order] = $this->renewalNearDeadline($this->customer());
+
+        foreach (['bukan-tanggal', now()->addDay()->toIso8601String(), now()->subYear()->toIso8601String()] as $raw) {
+            $order->recordPaymentReceivedAt($raw);
+            $this->assertNull($order->payment_received_at);
+        }
+    }
+
+    public function test_admin_transfer_time_rescues_vps_terminated_for_non_payment(): void
+    {
+        [$vps, $order, $deadline] = $this->renewalNearDeadline($this->customer());
+        \App\Models\RenewalReminder::create([
+            'vps_instance_id' => $vps->id,
+            'stage' => \App\Models\RenewalReminder::STAGE_GRACE_ENDED,
+            'period_expires_at' => $vps->expires_at,
+            'sent_at' => $deadline,
+        ]);
+        $vps->update(['status' => 'terminated']);
+        $transferred = $deadline->copy()->subMinutes(30);
+
+        $this->travelTo($deadline->copy()->addHours(5));
+        $this->actingAs($this->admin())
+            ->post(route('admin.payments.approve', $order->id), [
+                'transferred_at' => $transferred->copy()->timezone('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame('running', $vps->fresh()->status);
+        $this->assertNotNull($order->fresh()->renewal_applied_at);
+    }
+
+    public function test_payment_never_revives_vps_terminated_for_other_reasons(): void
+    {
+        [$vps, $order] = $this->renewalNearDeadline($this->customer());
+        $vps->update(['status' => 'terminated']);
+
+        // Masih sebelum batas akhir, tetapi terminasinya bukan karena tagihan.
+        $this->actingAs($this->admin())
+            ->post(route('admin.payments.approve', $order->id))
+            ->assertSessionHas('error');
+
+        $this->assertSame('terminated', $vps->fresh()->status);
+        $this->assertNotNull($order->fresh()->renewal_rejected_at);
+    }
+
+    public function test_admin_sees_error_when_late_approval_is_rejected(): void
+    {
+        [$vps, $order, $deadline] = $this->renewalNearDeadline($this->customer());
+
+        $this->travelTo($deadline->copy()->addHours(5));
+        $this->actingAs($this->admin())
+            ->post(route('admin.payments.approve', $order->id))
+            ->assertSessionHas('error');
+
+        $this->assertSame('suspended', $vps->fresh()->status);
+    }
+
+    public function test_admin_cannot_enter_future_transfer_time(): void
+    {
+        [, $order] = $this->renewalNearDeadline($this->customer());
+
+        $this->actingAs($this->admin())
+            ->post(route('admin.payments.approve', $order->id), [
+                'transferred_at' => now()->addDay()->timezone('Asia/Jakarta')->format('Y-m-d\TH:i'),
+            ])
+            ->assertSessionHas('error');
+
+        $this->assertSame('pending', $order->fresh()->status);
+    }
+
+    public function test_dashboard_list_shows_deadline_for_suspended_vps(): void
+    {
+        $customer = $this->customer();
+        [, , $deadline] = $this->renewalNearDeadline($customer);
+
+        $this->actingAs($customer)
+            ->get(route('dashboard.index'))
+            ->assertOk()
+            ->assertSee($deadline->copy()->timezone('Asia/Jakarta')->format('d M, H:i') . ' WIB');
     }
 
     private function adminWhatsAppMessages(): array
@@ -373,7 +524,7 @@ class PaymentCompletionAndSshAccessTest extends TestCase
                 'admin_notification_email' => self::ADMIN_EMAIL,
                 'admin_notification_whatsapp' => '081222333444, 6281555666777',
                 'fulfillment_sla_minutes' => 120,
-                'renewal_grace_days_vps' => 3,
+                'renewal_grace_days_vps' => 2,
                 'renewal_grace_days_database' => 7,
                 'renewal_grace_days_app' => 7,
             ])
@@ -391,7 +542,7 @@ class PaymentCompletionAndSshAccessTest extends TestCase
                 'admin_notification_email' => self::ADMIN_EMAIL,
                 'admin_notification_whatsapp' => 'nomor<script>',
                 'fulfillment_sla_minutes' => 120,
-                'renewal_grace_days_vps' => 3,
+                'renewal_grace_days_vps' => 2,
                 'renewal_grace_days_database' => 7,
                 'renewal_grace_days_app' => 7,
             ])
@@ -676,30 +827,31 @@ class PaymentCompletionAndSshAccessTest extends TestCase
         $this->assertCount(0, $this->adminWhatsAppMessages());
     }
 
-    public function test_customer_gets_h7_reminder_once(): void
+    public function test_customer_gets_h3_reminder_once(): void
     {
         $customer = $this->customer();
         $customer->update(['phone' => '081299998888']);
-        $vps = $this->runningVps($customer, ['expires_at' => now()->addDays(7)->setTime(12, 0)]);
+        $vps = $this->runningVps($customer, ['expires_at' => now()->addDays(3)->setTime(12, 0)]);
 
         $this->artisan('renewal:remind')->assertSuccessful();
         $this->artisan('renewal:remind')->assertSuccessful();
 
         Notification::assertSentToTimes($customer, \App\Notifications\InstanceRenewalReminderNotification::class, 1);
         Notification::assertSentTo($customer, \App\Notifications\InstanceRenewalReminderNotification::class,
-            fn ($n) => $n->stage === \App\Models\RenewalReminder::STAGE_H7
-                && str_contains($n->toWhatsApp($customer)->getContent(), '7 Hari Lagi'));
+            fn ($n) => $n->stage === \App\Models\RenewalReminder::STAGE_H3
+                && str_contains($n->toWhatsApp($customer)->getContent(), '3 Hari Lagi')
+                && str_contains($n->toWhatsApp($customer)->getContent(), '139.180.200.20'));
 
         $this->assertTrue(collect($this->adminWhatsAppMessages())->contains(fn ($m) => str_contains($m, 'RINGKASAN PERPANJANGAN')));
     }
 
     public function test_terms_page_shows_configured_grace_and_setup_sla(): void
     {
-        app(SettingsService::class)->set('renewal_grace_days_vps', 5, 'integer');
+        app(SettingsService::class)->set('renewal_grace_days_vps', 1, 'integer');
 
         $this->get(route('terms'))
             ->assertOk()
-            ->assertSee('selama 5 hari kalender', false)
+            ->assertSee('selama 1 hari kalender', false)
             ->assertSee('1&times;24 jam', false)
             ->assertDontSee('3 (tiga) hari kalender', false);
     }

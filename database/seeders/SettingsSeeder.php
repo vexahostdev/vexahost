@@ -175,9 +175,9 @@ class SettingsSeeder extends Seeder
                 'label' => 'Ambang Waktu Tanggap Pemenuhan (menit)', 'is_public' => false, 'sort_order' => 3,
             ],
             // Tenggang VexaHost WAJIB lebih pendek dari tenggang Supplier.
-            // Supplier: VPS dihapus setelah 7 hari, database dan aplikasi setelah 30 hari.
+            // Supplier: VPS dihentikan pada H+3, database dan aplikasi setelah 30 hari.
             'renewal_grace_days_vps' => [
-                'value' => 5, 'type' => 'integer', 'group' => 'notification',
+                'value' => 2, 'type' => 'integer', 'group' => 'notification',
                 'label' => 'Tenggang VPS (hari)', 'is_public' => false, 'sort_order' => 4,
             ],
             'renewal_grace_days_database' => [

@@ -312,7 +312,7 @@
                     <input type="number" name="deadline_days" required min="1" max="30" value="3"
                            class="{{ $inputClass }} font-mono-code">
                     <p class="text-[11px] text-slate-500 mt-1">
-                        Untuk VPS, sebaiknya di bawah 5 hari agar masih tersisa waktu sebelum Supplier menghapus data.
+                        Untuk VPS, sebaiknya maksimal 2 hari agar masih tersisa waktu sebelum Supplier menghapus data.
                     </p>
                 </div>
 

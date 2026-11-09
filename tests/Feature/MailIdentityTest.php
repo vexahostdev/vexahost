@@ -322,7 +322,7 @@ class MailIdentityTest extends TestCase
         $response = $this->actingAs($admin)->post(route('admin.settings.notification'), [
             'admin_notification_whatsapp' => '6281234567890',
             'fulfillment_sla_minutes' => 60,
-            'renewal_grace_days_vps' => 3,
+            'renewal_grace_days_vps' => 2,
             'renewal_grace_days_database' => 14,
             'renewal_grace_days_app' => 14,
         ]);

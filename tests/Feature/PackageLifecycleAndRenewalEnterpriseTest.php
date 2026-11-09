@@ -475,7 +475,7 @@ class PackageLifecycleAndRenewalEnterpriseTest extends TestCase
             'channel' => 'website',
         ]);
 
-        // Server expired 2 days ago and is suspended
+        // Server expired 1 day ago and is suspended (still within the 2-day grace)
         $instance = VpsInstance::create([
             'customer_id' => $customer->id,
             'organization_id' => $org->id,
@@ -485,7 +485,7 @@ class PackageLifecycleAndRenewalEnterpriseTest extends TestCase
             'status' => 'suspended',
             'os' => 'ubuntu2404',
             'provider' => 'tencent',
-            'expires_at' => now()->subDays(2),
+            'expires_at' => now()->subDay(),
         ]);
 
         // Top up user credit

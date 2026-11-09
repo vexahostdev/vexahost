@@ -220,7 +220,7 @@ class DisplayTimeAndClaimsTest extends TestCase
             ->assertSee('tidak menjanjikan persentase ketersediaan (uptime) tertentu', false)
             ->assertSee('tidak menyediakan pencadangan otomatis')
             ->assertDontSee('RAID-10')
-            ->assertSee('TOS-2026-V4');
+            ->assertSee('TOS-2026-V5');
     }
 
     public function test_terms_version_cannot_be_overridden_by_stale_env(): void
@@ -230,7 +230,7 @@ class DisplayTimeAndClaimsTest extends TestCase
 
         try {
             $config = require config_path('legal.php');
-            $this->assertSame('TOS-2026-V4', $config['terms_version']);
+            $this->assertSame('TOS-2026-V5', $config['terms_version']);
         } finally {
             putenv('TERMS_VERSION');
             unset($_ENV['TERMS_VERSION'], $_SERVER['TERMS_VERSION']);

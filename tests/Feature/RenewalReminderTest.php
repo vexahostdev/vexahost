@@ -65,7 +65,7 @@ class RenewalReminderTest extends TestCase
     {
         $renewal = app(RenewalService::class);
 
-        $this->assertSame(5, $renewal->graceDaysForType('vps'));
+        $this->assertSame(2, $renewal->graceDaysForType('vps'));
         $this->assertSame(25, $renewal->graceDaysForType('database'));
         $this->assertSame(25, $renewal->graceDaysForType('app'));
     }
@@ -81,7 +81,7 @@ class RenewalReminderTest extends TestCase
 
         $renewal = app(RenewalService::class);
 
-        $this->assertSame(6, $renewal->graceDaysForType('vps'));
+        $this->assertSame(2, $renewal->graceDaysForType('vps'));
         $this->assertSame(29, $renewal->graceDaysForType('database'));
     }
 
@@ -91,7 +91,7 @@ class RenewalReminderTest extends TestCase
         $instance = $this->makeInstance();
 
         $this->assertSame('vps', $renewal->productType($instance));
-        $this->assertSame(2, $renewal->safetyMarginFor($instance));
+        $this->assertSame(1, $renewal->safetyMarginFor($instance));
     }
 
     public function test_database_package_uses_database_grace_period(): void
@@ -117,7 +117,7 @@ class RenewalReminderTest extends TestCase
 
         $this->assertNotNull($instance->fresh()->grace_period_ends_at);
         $this->assertTrue(
-            $instance->fresh()->grace_period_ends_at->isSameDay($instance->expires_at->copy()->addDays(5))
+            $instance->fresh()->grace_period_ends_at->isSameDay($instance->expires_at->copy()->addDays(2))
         );
     }
 
@@ -138,18 +138,33 @@ class RenewalReminderTest extends TestCase
         ]);
     }
 
-    public function test_h_minus_1_reminder_is_sent(): void
+    public function test_h7_and_h1_no_longer_send_anything(): void
     {
         Notification::fake();
 
-        $instance = $this->makeInstance(['expires_at' => now()->addDay()]);
+        $h7 = $this->makeInstance(['expires_at' => now()->addDays(7)]);
+        $h1 = $this->makeInstance(['expires_at' => now()->addDay()]);
 
         $this->artisan('renewal:remind');
 
-        $this->assertDatabaseHas('renewal_reminders', [
-            'vps_instance_id' => $instance->id,
-            'stage' => RenewalReminder::STAGE_H1,
-        ]);
+        $this->assertSame(0, RenewalReminder::count());
+        Notification::assertNotSentTo($h7->customer, InstanceRenewalReminderNotification::class);
+        Notification::assertNotSentTo($h1->customer, InstanceRenewalReminderNotification::class);
+    }
+
+    public function test_due_date_suspends_without_customer_message_but_admin_is_told(): void
+    {
+        Notification::fake();
+
+        $instance = $this->makeInstance(['expires_at' => now()->subHours(2)]);
+
+        $this->artisan('renewal:remind');
+        $this->artisan('renewal:remind');
+
+        $this->assertSame('suspended', $instance->fresh()->status);
+        $this->assertNotNull($instance->fresh()->grace_period_ends_at);
+        Notification::assertNotSentTo($instance->customer, InstanceRenewalReminderNotification::class);
+        Notification::assertSentOnDemandTimes(AdminRenewalDigestNotification::class, count(\App\Support\MailIdentity::adminRecipients()));
     }
 
     /**
@@ -244,6 +259,183 @@ class RenewalReminderTest extends TestCase
         $this->artisan('renewal:remind');
 
         $this->assertSame('suspended', $instance->fresh()->status);
+    }
+
+    public function test_final_warning_is_sent_once_within_24_hours_of_deadline(): void
+    {
+        Notification::fake();
+
+        $instance = $this->makeInstance([
+            'status' => 'suspended',
+            'expires_at' => now()->subDay(),
+            'grace_period_ends_at' => now()->addHours(20),
+        ]);
+
+        $this->artisan('renewal:remind');
+        $this->artisan('renewal:remind');
+
+        $this->assertSame('suspended', $instance->fresh()->status);
+        $this->assertSame(1, RenewalReminder::where('vps_instance_id', $instance->id)
+            ->where('stage', RenewalReminder::STAGE_GRACE_FINAL)->count());
+        Notification::assertSentToTimes($instance->customer, InstanceRenewalReminderNotification::class, 1);
+    }
+
+    public function test_instance_suspended_close_to_deadline_still_gets_final_warning(): void
+    {
+        Notification::fake();
+
+        $instance = $this->makeInstance(['expires_at' => now()->subDay()->subHours(2)]);
+
+        $this->artisan('renewal:remind');
+
+        $this->assertSame('suspended', $instance->fresh()->status);
+        $this->assertSame(1, RenewalReminder::where('vps_instance_id', $instance->id)
+            ->where('stage', RenewalReminder::STAGE_GRACE_FINAL)->count());
+        Notification::assertSentToTimes($instance->customer, InstanceRenewalReminderNotification::class, 1);
+    }
+
+    // ======================= Batas akhir perpanjangan =======================
+
+    public function test_renewal_closes_the_moment_deadline_passes(): void
+    {
+        $expires = now()->subDays(2)->addMinute()->startOfSecond();
+        $instance = $this->makeInstance(['status' => 'suspended', 'expires_at' => $expires]);
+
+        $this->assertTrue($instance->fresh()->canBeRenewed());
+
+        $this->travelTo($expires->copy()->addDays(2)->addSecond());
+
+        $this->assertFalse($instance->fresh()->canBeRenewed());
+    }
+
+    public function test_stored_old_grace_date_cannot_keep_renewal_open(): void
+    {
+        $instance = $this->makeInstance([
+            'status' => 'suspended',
+            'expires_at' => now()->subDays(3),
+            'grace_period_ends_at' => now()->addDays(2),
+        ]);
+
+        $this->assertTrue($instance->isRenewalClosed());
+    }
+
+    public function test_late_payment_is_rejected_once_and_admin_is_alerted(): void
+    {
+        Notification::fake();
+
+        $instance = $this->makeInstance(['status' => 'suspended', 'expires_at' => now()->subDays(3)]);
+        $order = $this->paidRenewal($instance, now());
+        $expires = $instance->fresh()->expires_at->copy();
+
+        $service = app(RenewalService::class);
+        $this->assertNull($service->handleRenewalPayment($order));
+        $this->assertNull($service->handleRenewalPayment($order->fresh()));
+
+        $fresh = $order->fresh();
+        $this->assertNotNull($fresh->renewal_rejected_at);
+        $this->assertNull($fresh->renewal_applied_at);
+        $this->assertSame('cancelled', $fresh->status);
+        $this->assertSame('suspended', $instance->fresh()->status);
+        $this->assertTrue($instance->fresh()->expires_at->equalTo($expires));
+        Notification::assertSentToTimes($instance->customer, \App\Notifications\LateRenewalPaymentNotification::class, 1);
+    }
+
+    public function test_payment_after_termination_is_rejected(): void
+    {
+        Notification::fake();
+
+        $instance = $this->makeInstance(['status' => 'terminated', 'expires_at' => now()->subDays(5)]);
+        $order = $this->paidRenewal($instance, now());
+
+        $this->assertNull(app(RenewalService::class)->handleRenewalPayment($order));
+        $this->assertSame('terminated', $instance->fresh()->status);
+        $this->assertSame('cancelled', $order->fresh()->status);
+    }
+
+    public function test_on_time_payment_processed_late_is_still_honoured(): void
+    {
+        Notification::fake();
+
+        $expires = now()->subDays(3)->startOfSecond();
+        $instance = $this->makeInstance(['status' => 'suspended', 'expires_at' => $expires]);
+        $order = $this->paidRenewal($instance, $expires->copy()->addDay());
+
+        $this->assertNotNull(app(RenewalService::class)->handleRenewalPayment($order));
+
+        $this->assertNotNull($order->fresh()->renewal_applied_at);
+        $this->assertNull($order->fresh()->renewal_rejected_at);
+        $this->assertSame('running', $instance->fresh()->status);
+    }
+
+    public function test_late_payment_through_state_machine_skips_payment_received_notice(): void
+    {
+        Notification::fake();
+
+        $instance = $this->makeInstance(['status' => 'suspended', 'expires_at' => now()->subDays(3)]);
+        $order = $this->paidRenewal($instance, null);
+        $order->forceFill(['status' => 'pending'])->save();
+
+        app(\App\Services\OrderStateMachine::class)->transition($order, 'paid', [
+            'actor_type' => 'webhook',
+            'onLocked' => function (\App\Models\Order $locked) {
+                $locked->paid_at = now();
+                $locked->save();
+            },
+        ]);
+
+        $this->assertNotNull($order->fresh()->renewal_rejected_at);
+        $this->assertSame('cancelled', $order->fresh()->status);
+        Notification::assertSentToTimes($instance->customer, \App\Notifications\LateRenewalPaymentNotification::class, 1);
+        Notification::assertNotSentTo($instance->customer, \App\Notifications\PaymentReceivedNotification::class);
+    }
+
+    public function test_payment_page_is_closed_after_deadline_but_order_stays_pending(): void
+    {
+        $instance = $this->makeInstance(['status' => 'suspended', 'expires_at' => now()->subDays(3)]);
+        $order = $this->paidRenewal($instance, null);
+        $order->forceFill(['status' => 'pending'])->save();
+
+        $this->actingAs($instance->customer)
+            ->get(route('order.payment', $order->id))
+            ->assertRedirect(route('dashboard.vps.show', $instance->id))
+            ->assertSessionHas('error');
+
+        $this->assertSame('pending', $order->fresh()->status);
+    }
+
+    public function test_new_notification_emails_render_with_deadline(): void
+    {
+        $instance = $this->makeInstance(['status' => 'suspended', 'expires_at' => now()->subDay()]);
+        app(RenewalService::class)->applyGracePeriod($instance);
+        $order = $this->paidRenewal($instance, now());
+
+        $final = (new InstanceRenewalReminderNotification($instance, RenewalReminder::STAGE_GRACE_FINAL, 0, 2))
+            ->toMail($instance->customer)->render();
+        $late = (new \App\Notifications\LateRenewalPaymentNotification($order, $instance, $instance->renewalDeadline()))
+            ->toMail($instance->customer)->render();
+
+        $this->assertStringContainsString('Akan Segera Dihapus', (string) $final);
+        $this->assertStringContainsString('WIB', (string) $final);
+        $this->assertStringContainsString('dikembalikan', (string) $late);
+    }
+
+    protected function paidRenewal(VpsInstance $instance, $paidAt): \App\Models\Order
+    {
+        return \App\Models\Order::create([
+            'customer_id' => $instance->customer_id,
+            'vps_spec_id' => \App\Models\VpsSpec::query()->value('id'),
+            'vps_instance_id' => $instance->id,
+            'order_type' => 'renewal',
+            'status' => 'paid',
+            'amount' => 100000,
+            'payment_method' => 'midtrans_snap',
+            'control_panel' => 'coolify',
+            'datacenter_location' => 'indonesia',
+            'os' => 'ubuntu2404',
+            'channel' => 'website',
+            'billing_cycle' => 'monthly',
+            'paid_at' => $paidAt,
+        ]);
     }
 
     public function test_instance_without_expiry_is_ignored(): void

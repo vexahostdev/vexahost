@@ -44,6 +44,11 @@ class PaymentCompletionService
                 } catch (\Throwable $e) {
                     Log::error('payment_completion.renewal_failed', ['order_id' => $order->id, 'error' => $e->getMessage()]);
                 }
+
+                // Ditolak karena lewat batas: notifikasinya sudah dikirim RenewalService.
+                if ($order->renewal_rejected_at) {
+                    return;
+                }
             }
 
             $claimed = Order::whereKey($order->id)

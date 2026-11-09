@@ -234,7 +234,7 @@
                                 <strong>Pelanggaran Acceptable Use Policy (AUP):</strong> Server yang disuspend atau diterminasi karena terdeteksi menjalankan aktivitas penambangan kripto (crypto mining), serangan DDoS, pengiriman spam, hosting botnet, atau materi ilegal.
                             </li>
                             <li>
-                                <strong>Faktur Perpanjangan (Renewal):</strong> Pembayaran perpanjangan masa sewa untuk bulan kedua dan seterusnya tidak memenuhi syarat pengembalian dana, karena server telah dioperasikan pada periode sebelumnya.
+                                <strong>Faktur Perpanjangan (Renewal):</strong> Pembayaran perpanjangan masa sewa untuk bulan kedua dan seterusnya tidak memenuhi syarat pengembalian dana, karena server telah dioperasikan pada periode sebelumnya. Pengecualian: pembayaran yang diterima setelah masa tenggang berakhir tidak diproses dan dananya dikembalikan.
                             </li>
                             <li>
                                 <strong>Kesalahan Konfigurasi Internal Pengguna:</strong> Pengguna salah memilih varian Sistem Operasi (misal: memilih Ubuntu padahal membutuhkan Debian), salah mengatur iptables/UFW sehingga terkunci dari SSH, atau gagal mengompilasi aplikasi mandiri.

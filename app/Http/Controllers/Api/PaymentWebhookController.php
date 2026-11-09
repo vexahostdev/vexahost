@@ -68,6 +68,8 @@ class PaymentWebhookController extends Controller
             'transaction_id' => 'nullable|string',
             'payment_type' => 'nullable|string',
             'fraud_status' => 'nullable|string',
+            'settlement_time' => 'nullable|string',
+            'transaction_time' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -347,6 +349,9 @@ class PaymentWebhookController extends Controller
                 ],
                 'onLocked' => function (Order $locked) use ($tx, $validated) {
                     $locked->paid_at = now();
+                    $locked->recordPaymentReceivedAt(
+                        $validated['payment_time'] ?? $validated['settlement_time'] ?? $validated['transaction_time'] ?? null
+                    );
                     $locked->payment_method = $validated['payment_type'] ?? $locked->payment_method;
                     $locked->save();
 
@@ -721,6 +726,7 @@ class PaymentWebhookController extends Controller
                     $this->handleSettlement($order, $tx, $event, [
                         'payment_type' => $channel,
                         'gross_amount' => $grossAmount,
+                        'payment_time' => $payload['paid_at'] ?? null,
                     ]);
                     $needsNotification = true;
                     return [

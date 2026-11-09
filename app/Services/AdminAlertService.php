@@ -69,6 +69,29 @@ class AdminAlertService
     }
 
     /**
+     * Pembayaran perpanjangan masuk setelah batas akhir: admin harus mengembalikan dana.
+     */
+    public function lateRenewalPayment(Order $order, \App\Models\VpsInstance $instance, $deadline): bool
+    {
+        $text = implode("\n", [
+            '🚨 *PEMBAYARAN LEWAT BATAS — PERLU REFUND*',
+            '',
+            "• *Order:* #{$order->id}",
+            '• *Layanan:* ' . ($instance->hostname ?? '-'),
+            '• *Pelanggan:* ' . ($order->customer?->full_name ?? '-') . ($order->customer?->phone ? " ({$order->customer->phone})" : ''),
+            '• *Nominal:* Rp ' . number_format((float) $order->amount, 0, ',', '.'),
+            '• *Dibayar:* ' . $this->jakarta($order->paid_at),
+            '• *Batas akhir:* ' . $this->jakarta($deadline),
+            '',
+            'Masa aktif TIDAK ditambah dan order dibatalkan otomatis.',
+            '✅ *Tugas:* kembalikan dana lewat transfer manual di Billing Center:',
+            $this->url('/admin/billing'),
+        ]);
+
+        return $this->digest("[Refund] Pembayaran perpanjangan lewat batas — Order #{$order->id}", $text);
+    }
+
+    /**
      * Ringkasan order lunas yang belum diserahkan (satu pesan untuk semua order).
      *
      * @param Collection<int, Order> $orders

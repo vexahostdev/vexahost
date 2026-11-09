@@ -67,14 +67,16 @@ Schedule::command('billing:terminate-expired')
 // ============================================================
 // PHASE 3 - Pengingat perpanjangan instance
 // ============================================================
-// Dijalankan sekali sehari. Idempotensi dijamin indeks unik di
-// tabel renewal_reminders, sehingga aman bila terjadi pengulangan.
+// Dijalankan tiap jam pada 09:00-21:00 WIB agar peringatan terakhir tidak datang
+// mepet batas akhir, dan pelanggan tidak menerima pesan tengah malam. Idempotensi
+// dijamin indeks unik di tabel renewal_reminders, sehingga tiap tahap hanya terkirim sekali.
 Schedule::command('renewal:remind')
-    ->dailyAt('09:00')
+    ->hourlyAt(0)
+    ->between('9:00', '21:00')
     ->timezone('Asia/Jakarta')
     ->withoutOverlapping()
     ->onOneServer()
-    ->description('Kirim pengingat H-3/H-1/H-0 instance dan pindahkan status yang jatuh tempo.');
+    ->description('Kirim pengingat perpanjangan instance dan pindahkan status yang jatuh tempo.');
 
 // ============================================================
 // PHASE 5 - Peringatan waktu tanggap fulfillment

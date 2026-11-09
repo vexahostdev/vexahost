@@ -282,8 +282,15 @@
 
                                 <div class="space-y-1.5">
                                     <label class="font-semibold text-slate-700 block">Nomor Referensi Mutasi DANA (Opsional):</label>
-                                    <input type="text" name="reference" x-model="reference" placeholder="Contoh: DANA-20260915-XXXXX" 
+                                    <input type="text" name="reference" x-model="reference" placeholder="Contoh: DANA-20260915-XXXXX"
                                            class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-black">
+                                </div>
+
+                                <div class="space-y-1.5">
+                                    <label class="font-semibold text-slate-700 block">Waktu Transfer di Mutasi, WIB (Opsional):</label>
+                                    <input type="datetime-local" name="transferred_at"
+                                           class="w-full text-xs p-2.5 border border-slate-300 rounded-lg focus:outline-none focus:border-black">
+                                    <p class="text-[11px] text-slate-500">Isi untuk perpanjangan, agar transfer yang tepat waktu tidak ditolak karena baru diverifikasi setelah batas akhir.</p>
                                 </div>
 
                                 <div class="space-y-1.5">

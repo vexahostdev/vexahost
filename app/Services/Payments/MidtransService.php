@@ -392,8 +392,9 @@ class MidtransService
                         'payment_type' => $paymentType,
                         'order_ref' => $refId,
                     ],
-                    'onLocked' => function (Order $locked) use ($paymentType, $tx) {
+                    'onLocked' => function (Order $locked) use ($paymentType, $tx, $data) {
                         $locked->paid_at = now();
+                        $locked->recordPaymentReceivedAt($data['settlement_time'] ?? $data['transaction_time'] ?? null);
                         $locked->payment_method = $paymentType ?: $locked->payment_method;
                         $locked->save();
 

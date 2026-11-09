@@ -350,18 +350,19 @@
                     <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 mb-4">
                         <p class="text-[11px] text-amber-900 leading-relaxed">
                             Tenggang VexaHost wajib <strong>lebih pendek</strong> daripada batas Supplier.
-                            Supplier menghapus VPS setelah <strong>7 hari</strong> suspensi, sedangkan database
-                            dan aplikasi setelah <strong>30 hari</strong>. Selisihnya adalah ruang Anda untuk bertindak.
+                            Supplier menghentikan VPS pada <strong>H+3</strong>, sedangkan database
+                            dan aplikasi setelah <strong>30 hari</strong>. Lewat dari batas tenggang,
+                            perpanjangan dan pembayaran pelanggan otomatis ditutup.
                         </p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div>
                             <label class="{{ $labelClass }}">Tenggang VPS (hari)</label>
-                            <input type="number" name="renewal_grace_days_vps" required min="1" max="6"
-                                   value="{{ old('renewal_grace_days_vps', $settings->int('renewal_grace_days_vps', 5)) }}"
+                            <input type="number" name="renewal_grace_days_vps" required min="1" max="2"
+                                   value="{{ old('renewal_grace_days_vps', app(\App\Services\RenewalService::class)->graceDaysForType('vps')) }}"
                                    class="{{ $inputClass }} font-mono-code">
-                            <p class="text-[11px] text-slate-500 mt-1">Batas Supplier: 7 hari</p>
+                            <p class="text-[11px] text-slate-500 mt-1">Batas Supplier: H+3</p>
                         </div>
                         <div>
                             <label class="{{ $labelClass }}">Tenggang Database (hari)</label>

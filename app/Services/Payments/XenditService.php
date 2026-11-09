@@ -247,8 +247,9 @@ class XenditService
                             'provider' => 'xendit',
                             'provider_tx_id' => $tx->provider_transaction_id,
                         ],
-                        'onLocked' => function (Order $locked) use ($tx) {
+                        'onLocked' => function (Order $locked) use ($tx, $invoiceData) {
                             $locked->paid_at = now();
+                            $locked->recordPaymentReceivedAt($invoiceData['paid_at'] ?? null);
                             if ($tx->payment_method) {
                                 $locked->payment_method = $tx->payment_method;
                             }

@@ -387,6 +387,17 @@ class VpsInstance extends Model
         return $this->expires_at->isPast() && $this->grace_period_ends_at->isFuture();
     }
 
+    public function renewalDeadline(): ?\Illuminate\Support\Carbon
+    {
+        return app(\App\Services\RenewalService::class)->renewalDeadlineFor($this);
+    }
+
+    /** Batas akhir tenggang sudah lewat: perpanjangan dan pembayarannya tertutup. */
+    public function isRenewalClosed(): bool
+    {
+        return app(\App\Services\RenewalService::class)->isRenewalClosed($this);
+    }
+
     /**
      * Label status untuk pelanggan.
      *
@@ -531,6 +542,10 @@ class VpsInstance extends Model
     public function canBeRenewed(): bool
     {
         if (in_array($this->status, ['terminated', 'provisioning'], true)) {
+            return false;
+        }
+
+        if ($this->isRenewalClosed()) {
             return false;
         }
 

@@ -138,12 +138,18 @@ class AdminController extends Controller
         $validated = $request->validate([
             'reference' => 'nullable|string|max:100',
             'note' => 'nullable|string|max:500',
+            'transferred_at' => 'nullable|date',
         ]);
 
         $order = Order::with('invoice')->findOrFail($id);
 
         if ($order->status !== 'pending') {
             return back()->with('error', "Order #{$order->id} berstatus {$order->status}, hanya order pending yang dapat disetujui.");
+        }
+
+        if (!empty($validated['transferred_at'])
+            && \Illuminate\Support\Carbon::parse($validated['transferred_at'], 'Asia/Jakarta')->isFuture()) {
+            return back()->with('error', 'Waktu transfer tidak boleh di masa depan.');
         }
 
         try {
@@ -177,8 +183,9 @@ class AdminController extends Controller
                             'reference' => $validated['reference'] ?? null,
                             'transaction_id' => $tx->id,
                         ],
-                        'onLocked' => function (Order $locked) use ($tx) {
+                        'onLocked' => function (Order $locked) use ($tx, $validated) {
                             $locked->paid_at = now();
+                            $locked->recordPaymentReceivedAt($validated['transferred_at'] ?? null);
                             $locked->save();
 
                             if ($locked->invoice) {
@@ -209,6 +216,10 @@ class AdminController extends Controller
             app(\App\Services\PaymentCompletionService::class)->handle($order->id);
         } catch (InvalidStateTransitionException $e) {
             return back()->with('error', 'Gagal menyetujui pembayaran: ' . $e->getMessage());
+        }
+
+        if ($order->fresh()->renewal_rejected_at) {
+            return back()->with('error', "Pembayaran Order #{$order->id} melewati batas akhir perpanjangan, sehingga ditolak dan order dibatalkan. Kembalikan dana lewat Billing Center. Bila transfer sebenarnya tepat waktu, hubungi pelanggan dan tangani manual.");
         }
 
         return back()->with('success', "Pembayaran Order #{$order->id} (Invoice: {$order->invoice?->invoice_number}) berhasil disetujui. Email konfirmasi telah dikirim ke pelanggan.");

@@ -264,7 +264,7 @@ class SupplierPurchaseTest extends TestCase
         $instance = $this->makeInstance();
         $notifications = [
             new \App\Notifications\InstanceRenewalReminderNotification($instance, \App\Models\RenewalReminder::STAGE_H3, 3, 5),
-            new \App\Notifications\InstanceRenewalReminderNotification($instance, \App\Models\RenewalReminder::STAGE_H0, 0, 5),
+            new \App\Notifications\InstanceRenewalReminderNotification($instance, \App\Models\RenewalReminder::STAGE_GRACE_FINAL, 0, 5),
             new \App\Notifications\InstanceRenewalReminderNotification($instance, \App\Models\RenewalReminder::STAGE_GRACE_ENDED, -1, 5),
         ];
 

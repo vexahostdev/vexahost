@@ -266,7 +266,7 @@ class FulfillmentWorkboardTest extends TestCase
         ]);
 
         $instance = VpsInstance::where('order_id', $order->id)->first();
-        $this->assertSame(5, (int) round($instance->expires_at->diffInDays($instance->grace_period_ends_at)));
+        $this->assertSame(2, (int) round($instance->expires_at->diffInDays($instance->grace_period_ends_at)));
     }
 
     public function test_handover_text_contains_access_but_no_password(): void
